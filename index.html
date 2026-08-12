@@ -683,13 +683,13 @@ function renderProgress(){
         let isLastKampung = S.v === vs.length - 1;
         let labelLast = "";
         
-        // Menampilkan label untuk hari terakhir di setiap kampung
-        // Termasuk kampung terakhir, tetapi tidak menghilangkan form
+        // Hanya tampilkan label, form tetap muncul untuk semua hari
         if (last && !isLastKampung) {
             labelLast = " — HARI TERAKHIR KAMPUNG (SEBELUM PINDAH)";
         } else if (last && isLastKampung) {
             labelLast = " — HARI TERAKHIR KAMPUNG (PENUTUPAN)";
         }
+        
         h+=`<div class="day ${last?"last":""}"><h4>${fmt(d)}${labelLast}</h4><div class="daybody">`;
         v.items.filter(w=>d>=w.start&&d<=w.end).forEach(w=>{
             let k=w.sls+"||"+w.ppl;
@@ -712,7 +712,7 @@ function renderProgress(){
     </div>`;
     $("content").innerHTML=h;
 }
-
+    
 // ===== DOKUMENTASI =====
 function renderDokumentasi(){
     let vs = group();
