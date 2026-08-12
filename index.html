@@ -601,12 +601,15 @@ function generate(){
     let e=validate();
     if(e){$("status").innerHTML=`<div class="status err">${esc(e)}</div>`;return}
     
-    group().forEach(v=>{
+    // Variabel vs didefinisikan di sini agar bisa dipakai di seluruh fungsi generate
+    let vs = group(); 
+    
+    vs.forEach(v=>{
         if(!S.photos[v.name]) S.photos[v.name] = [];
         if(S.photos[v.name].length === 0) S.photos[v.name].push({src:"",caption:""});
     });
     
-    group().forEach(v=>{
+    vs.forEach(v=>{
         S.p[v.name]??={};
         let ds=[...new Set(v.items.flatMap(w=>dates(w.start,w.end)))].sort();
         ds.forEach(d=>{
@@ -622,7 +625,7 @@ function generate(){
                 let bangunanVal = Math.round((w.bangunanTotal || 0) / days);
                 let usahaVal = Math.round((w.usahaTotal || 0) / days);
                 
-                // Logika khusus untuk hari pertama di kampung pertama (pembagian lebih sedikit)
+                // Logika khusus: Hari pertama di kampung pertama mendapat porsi lebih sedikit
                 if (v.name === vs[0].name && d === ds[0]) {
                     assignVal = Math.floor((w.assignmentTotal || 0) / (days * 1.5));
                     bkuVal = Math.floor((w.bkuTotal || 0) / (days * 1.5));
