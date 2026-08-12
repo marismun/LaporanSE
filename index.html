@@ -307,8 +307,18 @@ const S={
 
 const $=id=>document.getElementById(id);
 const esc=x=>String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
-const dates=(a,b)=>{let r=[];if(!a||!b)return r;let d=new Date(a+"T00:00:00"),e=new Date(b+"T00:00:00");while(d<=e){r.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+1)}return r};
-
+const dates=(a,b)=>{
+    let r=[];
+    if(!a||!b) return r;
+    let d=new Date(a+"T00:00:00");
+    let e=new Date(b+"T00:00:00");
+    // Loop termasuk tanggal akhir (e)
+    while(d<=e){
+        r.push(d.toISOString().slice(0,10));
+        d.setDate(d.getDate()+1);
+    }
+    return r;
+};
 // ===== KONFIGURASI CLOUDINARY =====
 const CLOUDINARY_CLOUD_NAME = "uxr4cmqd";
 const CLOUDINARY_UPLOAD_PRESET = "Laporan";
@@ -672,6 +682,9 @@ function renderProgress(){
         let last = i === ds.length - 1;
         let isLastKampung = S.v === vs.length - 1;
         let labelLast = "";
+        
+        // Menampilkan label untuk hari terakhir di setiap kampung
+        // Termasuk kampung terakhir, tetapi tidak menghilangkan form
         if (last && !isLastKampung) {
             labelLast = " — HARI TERAKHIR KAMPUNG (SEBELUM PINDAH)";
         } else if (last && isLastKampung) {
