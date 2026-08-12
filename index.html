@@ -312,13 +312,13 @@ const dates=(a,b)=>{
     if(!a||!b) return r;
     let d=new Date(a+"T00:00:00");
     let e=new Date(b+"T00:00:00");
-    // Loop termasuk tanggal akhir (e)
     while(d<=e){
         r.push(d.toISOString().slice(0,10));
         d.setDate(d.getDate()+1);
     }
     return r;
 };
+
 // ===== KONFIGURASI CLOUDINARY =====
 const CLOUDINARY_CLOUD_NAME = "uxr4cmqd";
 const CLOUDINARY_UPLOAD_PRESET = "Laporan";
@@ -611,7 +611,6 @@ function generate(){
     let e=validate();
     if(e){$("status").innerHTML=`<div class="status err">${esc(e)}</div>`;return}
     
-    // Variabel vs didefinisikan di sini agar bisa dipakai di seluruh fungsi generate
     let vs = group(); 
     
     vs.forEach(v=>{
@@ -635,7 +634,6 @@ function generate(){
                 let bangunanVal = Math.round((w.bangunanTotal || 0) / days);
                 let usahaVal = Math.round((w.usahaTotal || 0) / days);
                 
-                // Logika khusus: Hari pertama di kampung pertama mendapat porsi lebih sedikit
                 if (v.name === vs[0].name && d === ds[0]) {
                     assignVal = Math.floor((w.assignmentTotal || 0) / (days * 1.5));
                     bkuVal = Math.floor((w.bkuTotal || 0) / (days * 1.5));
@@ -666,6 +664,7 @@ function generate(){
     $("progress").classList.remove("hidden");
     $("status").innerHTML = '<div class="status">✅ Form progres dan dokumentasi berhasil digenerate.</div>';
 }
+
 // ===== PROGRESS =====
 function setVal(v,d,k,f,val){S.p[v][d].items[k][f]=val}
 
@@ -683,13 +682,11 @@ function renderProgress(){
         let isLastKampung = S.v === vs.length - 1;
         let labelLast = "";
         
-        // Hanya tampilkan label, form tetap muncul untuk semua hari
         if (last && !isLastKampung) {
             labelLast = " — HARI TERAKHIR KAMPUNG (SEBELUM PINDAH)";
         } else if (last && isLastKampung) {
             labelLast = " — HARI TERAKHIR KAMPUNG (PENUTUPAN)";
         }
-        
         h+=`<div class="day ${last?"last":""}"><h4>${fmt(d)}${labelLast}</h4><div class="daybody">`;
         v.items.filter(w=>d>=w.start&&d<=w.end).forEach(w=>{
             let k=w.sls+"||"+w.ppl;
@@ -712,7 +709,7 @@ function renderProgress(){
     </div>`;
     $("content").innerHTML=h;
 }
-    
+
 // ===== DOKUMENTASI =====
 function renderDokumentasi(){
     let vs = group();
@@ -896,30 +893,32 @@ function generateNarrativeTable(){
         let isLastKampung = (vi === totalKampung - 1);
         
         ds.forEach((d, di) => {
-            let last = di === ds.length - 1;
-            let isLastDay = isLastKampung && last;
+            let isFirstDayInKampung = (di === 0);
+            let isLastDayInKampung = (di === ds.length - 1);
+            let isFinalDay = isLastKampung && isLastDayInKampung;
             
             out += `<p style="margin-top:12pt;margin-bottom:0pt;text-align:justify;"><b>${fmt(d)}</b></p>`;
             out += `<ul style="margin-top:3pt;margin-bottom:0pt;padding-left:20pt;text-align:justify;">`;
             
-            if (vi === 0 && firstDay) {
-                out += `<li style="text-align:justify;margin-bottom:3pt;">Tim berangkat dari Waisai menuju ${esc(v.name)}, Distrik ${esc(v.distrik)}, menggunakan transportasi perahu motor. Tim tiba di kampung tujuan dan mempersiapkan pelaksanaan pendataan lapangan.</li>`;
-                firstDay = false;
-            } 
-            else if (firstDay && vi > 0) {
-                out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melakukan perjalanan dari ${esc(vs[vi-1].name)} menuju ${esc(v.name)}, Distrik ${esc(v.distrik)}. Setelah tiba, tim melakukan koordinasi dengan aparat kampung untuk izin dan persiapan pelaksanaan pendataan.</li>`;
-                firstDay = false;
-            }
-            
-            if (di === 0) {
-                out += `<li style="text-align:justify;margin-bottom:3pt;">Tim menemui Bapak ${esc(namaAparat)} selaku ${esc(jabatanAparat)} ${esc(v.name)}.</li>`;
-                out += `<li style="text-align:justify;margin-bottom:3pt;">Tim meminta visum Surat Tugas serta menyampaikan maksud dan tujuan pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026 kepada aparat kampung.</li>`;
-                out += `<li style="text-align:justify;margin-bottom:3pt;">Setelah memperoleh izin, masing-masing petugas menuju wilayah tugas untuk melakukan penelusuran wilayah.</li>`;
+            // NARASI KHUSUS HARI PERTAMA DI SETIAP KAMPUNG
+            if (isFirstDayInKampung) {
+                if (vi === 0) {
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim berangkat dari Waisai menuju ${esc(v.name)}, Distrik ${esc(v.distrik)}, menggunakan transportasi perahu motor. Tim tiba di kampung tujuan dan mempersiapkan pelaksanaan pendataan lapangan.</li>`;
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim menemui Bapak ${esc(namaAparat)} selaku ${esc(jabatanAparat)} ${esc(v.name)}.</li>`;
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim meminta visum Surat Tugas serta menyampaikan maksud dan tujuan pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026 kepada aparat kampung.</li>`;
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Setelah memperoleh izin, masing-masing petugas menuju wilayah tugas untuk melakukan penelusuran wilayah.</li>`;
+                } else {
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melakukan check ulang dan memastikan data kampung sebelumnya (${esc(vs[vi-1].name)}) sebelum melakukan perpindahan.</li>`;
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melakukan perjalanan dari ${esc(vs[vi-1].name)} menuju ${esc(v.name)}, Distrik ${esc(v.distrik)}. Setelah tiba, tim melakukan koordinasi dengan aparat kampung untuk izin dan persiapan pelaksanaan pendataan.</li>`;
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim menemui Bapak ${esc(namaAparat)} selaku ${esc(jabatanAparat)} ${esc(v.name)}.</li>`;
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim meminta visum Surat Tugas serta menyampaikan maksud dan tujuan pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026 kepada aparat kampung.</li>`;
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Setelah memperoleh izin, masing-masing petugas menuju wilayah tugas untuk melakukan penelusuran wilayah.</li>`;
+                }
             } else {
-                // Hari kedua dan seterusnya
                 out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melanjutkan kegiatan pendataan door to door pada wilayah tugas masing-masing.</li>`;
             }
             
+            // DATA PROGRES PER PPL (Untuk SEMUA Hari)
             Object.values(S.p[v.name][d].items).forEach(x => {
                 let a = +x.assignment || 0, b = +x.bku || 0, k = +x.keluarga || 0, bl = +x.bangunan || 0, u = +x.usaha || 0;
                 if (!a && !b && !k && !bl && !u && !x.notes) {
@@ -934,17 +933,25 @@ function generateNarrativeTable(){
                 out += `<li style="text-align:justify;margin-bottom:3pt;">PPL ${esc(x.ppl)} melakukan pendataan di SLS ${esc(x.sls)} dan berhasil mendata serta submit sebanyak <b>${a}</b> assignment${detail} Total usaha yang ditemukan sebanyak <b>${u}</b> usaha.${x.notes ? " " + esc(x.notes) : ""}</li>`;
             });
             
-            if (isLastDay) {
-                out += `<li style="text-align:justify;margin-bottom:3pt;">Petugas melakukan pengecekan administrasi dan kelengkapan hasil pendataan sebagai tahap akhir kegiatan lapangan.</li>`;
-                out += `<li style="text-align:justify;margin-bottom:3pt;">Setelah seluruh hasil pendataan dinyatakan lengkap, tim mempersiapkan keberangkatan kembali menuju Waisai.</li>`;
-                out += `<li style="text-align:justify;margin-bottom:3pt;">Tim meninggalkan Kampung ${esc(v.name)} dan melakukan perjalanan kembali ke Waisai.</li>`;
-                
-                let tglAwal = document.getElementById('tanggalAwal').value.trim();
-                let tglAkhir = document.getElementById('tanggalAkhir').value.trim();
-                let tglAwalDisplay = tglAwal || S.tanggalAwal ? formatTanggalRange(S.tanggalAwal, S.tanggalAkhir) : '';
-                let rangeText = tglAwalDisplay || `${fmt(S.tanggalAwal)} sampai ${fmt(S.tanggalAkhir)}`;
-                
-                out += `<li style="text-align:justify;margin-bottom:3pt;">Dengan keberangkatan tersebut, rangkaian kegiatan pendataan lapangan pada periode ${rangeText} dinyatakan selesai.</li>`;
+            // NARASI KHUSUS HARI TERAKHIR KAMPUNG
+            if (isLastDayInKampung) {
+                if (isFinalDay) {
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Petugas melakukan check ulang dan memastikan isian kampung terakhir (${esc(v.name)}) sebelum kembali ke Waisai.</li>`;
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Petugas melakukan pengecekan administrasi dan kelengkapan hasil pendataan sebagai tahap akhir kegiatan lapangan.</li>`;
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Setelah seluruh hasil pendataan dinyatakan lengkap, tim mempersiapkan keberangkatan kembali menuju Waisai.</li>`;
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim meninggalkan Kampung ${esc(v.name)} dan melakukan perjalanan kembali ke Waisai.</li>`;
+                    
+                    let tglAwal = document.getElementById('tanggalAwal').value.trim();
+                    let tglAkhir = document.getElementById('tanggalAkhir').value.trim();
+                    let tglAwalDisplay = tglAwal || S.tanggalAwal ? formatTanggalRange(S.tanggalAwal, S.tanggalAkhir) : '';
+                    let rangeText = tglAwalDisplay || `${fmt(S.tanggalAwal)} sampai ${fmt(S.tanggalAkhir)}`;
+                    
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Dengan keberangkatan tersebut, rangkaian kegiatan pendataan lapangan pada periode ${rangeText} dinyatakan selesai.</li>`;
+                } else {
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melakukan check ulang dan memastikan isian kampung ${esc(v.name)} sebelum melakukan perpindahan ke kampung berikutnya.</li>`;
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melakukan pengecekan administrasi dan kelengkapan hasil pendataan pada Kampung ${esc(v.name)}.</li>`;
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim mempersiapkan perpindahan dan keberangkatan menuju Kampung ${esc(vs[vi+1].name)}.</li>`;
+                }
             }
             
             out += `</ul>`;
@@ -967,7 +974,6 @@ function generateWordHTML(resizedImages){
     
     let tanggalDisplay = formatTanggalRange(tanggalAwal, tanggalAkhir);
     
-    // Ambil nama petugas langsung dari form utama
     let pplNames = S.petugas.filter(p => p.trim());
     
     docHtml += `<tr>
@@ -1132,7 +1138,6 @@ function preview(){
     previewDiv.innerHTML = generateWordHTML(null);
     previewDiv.classList.add('visible');
     
-    // Scroll otomatis ke preview
     setTimeout(() => {
         previewDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
@@ -1219,14 +1224,12 @@ function generateOfflineWordAndBackup(resizedImages){
     let htmlContent = generateWordHTML(resizedImages);
     let blob = new Blob(["\ufeff" + htmlContent], {type: "application/msword;charset=utf-8"});
 
-    // Format nama file sesuai keinginan
     let pplNames = [];
     S.wilayah.forEach(w => { if(w.ppl && w.ppl.trim() && !pplNames.includes(w.ppl.trim())) pplNames.push(w.ppl.trim()); });
     let namaPpl = pplNames.length > 0 ? pplNames[0] : "TanpaNama";
     let tanggalSekarang = new Date().toLocaleDateString("id-ID", {day:"numeric", month:"short", year:"numeric"}).replace(/\s/g, "_");
     let fileName = `Laporan_Perjalanan_Dinas_Tim_${namaPpl}_${tanggalSekarang}.doc`;
 
-    // STEP 1: Download Offline ke lokal user terlebih dahulu
     let link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = fileName;
@@ -1235,7 +1238,6 @@ function generateOfflineWordAndBackup(resizedImages){
     document.body.removeChild(link);
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 
-    // STEP 2: Upload backup ke Cloudinary
     $("status").innerHTML = '<div class="status">⏳ Mengupload backup Word ke Cloudinary...</div>';
     
     uploadFileToCloudinary(blob, false, function(wordUrl, displayName) {
