@@ -171,17 +171,14 @@ input:focus,select:focus,textarea:focus{
 .hidden{display:none!important}
 footer{margin-top:30px;text-align:center;color:var(--text-gray);font-size:12px;border-top:1px solid #e2e8f0;padding-top:16px;}
 
-/* ===== RESPONSIVE HP (PERBAIKAN UTAMA DISINI) ===== */
+/* ===== RESPONSIVE HP ===== */
 @media(max-width:768px){
     :root{--toolbar-height: 80px;}
     body{padding-top:calc(var(--toolbar-height) + 10px);}
     .global-toolbar{padding:6px 10px;font-size:11px;justify-content:center;}
     .btn{font-size:10px;padding:4px 8px;}
     .grid-2{grid-template-columns:1fr;}
-    /* 5 kolom di ubah menjadi 2 kolom agar label tidak terpotong */
     .cols-5{grid-template-columns:repeat(2, 1fr) !important; gap:8px !important;}
-    .cols-5 div { margin-bottom: 4px; } /* Beri jarak vertikal kecil */
-    /* Grid progres harian di ubah menjadi 3 kolom agar input angka terlihat jelas */
     .metrics{grid-template-columns:repeat(3, 1fr) !important; gap:5px !important;}
     .photo-grid{grid-template-columns:repeat(2,1fr);}
     .section-card{padding:14px;}
@@ -616,17 +613,32 @@ function generate(){
             S.p[v.name][d]??={notes:"", items:{}};
             v.items.filter(w=>d>=w.start&&d<=w.end).forEach(w=>{
                 let k=w.sls+"||"+w.ppl;
-                // hitung jumlah hari untuk SLS/PPL ini
                 let days = dates(w.start, w.end).length;
                 if(days === 0) days = 1;
+                
+                let assignVal = Math.round((w.assignmentTotal || 0) / days);
+                let bkuVal = Math.round((w.bkuTotal || 0) / days);
+                let keluargaVal = Math.round((w.keluargaTotal || 0) / days);
+                let bangunanVal = Math.round((w.bangunanTotal || 0) / days);
+                let usahaVal = Math.round((w.usahaTotal || 0) / days);
+                
+                // Logika khusus untuk hari pertama di kampung pertama (pembagian lebih sedikit)
+                if (v.name === vs[0].name && d === ds[0]) {
+                    assignVal = Math.floor((w.assignmentTotal || 0) / (days * 1.5));
+                    bkuVal = Math.floor((w.bkuTotal || 0) / (days * 1.5));
+                    keluargaVal = Math.floor((w.keluargaTotal || 0) / (days * 1.5));
+                    bangunanVal = Math.floor((w.bangunanTotal || 0) / (days * 1.5));
+                    usahaVal = Math.floor((w.usahaTotal || 0) / (days * 1.5));
+                }
+                
                 S.p[v.name][d].items[k]??={
                     sls:w.sls,
                     ppl:w.ppl,
-                    assignment: Math.round((w.assignmentTotal || 0) / days),
-                    bku: Math.round((w.bkuTotal || 0) / days),
-                    keluarga: Math.round((w.keluargaTotal || 0) / days),
-                    bangunan: Math.round((w.bangunanTotal || 0) / days),
-                    usaha: Math.round((w.usahaTotal || 0) / days),
+                    assignment: assignVal,
+                    bku: bkuVal,
+                    keluarga: keluargaVal,
+                    bangunan: bangunanVal,
+                    usaha: usahaVal,
                     notes:""
                 };
             });
@@ -887,7 +899,10 @@ function generateNarrativeTable(){
             if (di === 0) {
                 out += `<li style="text-align:justify;margin-bottom:3pt;">Tim menemui Bapak ${esc(namaAparat)} selaku ${esc(jabatanAparat)} ${esc(v.name)}.</li>`;
                 out += `<li style="text-align:justify;margin-bottom:3pt;">Tim meminta visum Surat Tugas serta menyampaikan maksud dan tujuan pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026 kepada aparat kampung.</li>`;
-                out += `<li style="text-align:justify;margin-bottom:3pt;">Setelah memperoleh izin, masing-masing petugas menuju wilayah tugas untuk melakukan penelusuran wilayah dan dilanjutkan dengan pendataan door to door.</li>`;
+                out += `<li style="text-align:justify;margin-bottom:3pt;">Setelah memperoleh izin, masing-masing petugas menuju wilayah tugas untuk melakukan penelusuran wilayah.</li>`;
+            } else {
+                // Hari kedua dan seterusnya
+                out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melanjutkan kegiatan pendataan door to door pada wilayah tugas masing-masing.</li>`;
             }
             
             Object.values(S.p[v.name][d].items).forEach(x => {
@@ -937,8 +952,7 @@ function generateWordHTML(resizedImages){
     
     let tanggalDisplay = formatTanggalRange(tanggalAwal, tanggalAkhir);
     
-    // === PERUBAHAN PENTING DI SINI ===
-    // Ambil nama petugas langsung dari form utama, terlepas dari pemilihan PPL di wilayah tugas
+    // Ambil nama petugas langsung dari form utama
     let pplNames = S.petugas.filter(p => p.trim());
     
     docHtml += `<tr>
