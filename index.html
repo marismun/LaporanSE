@@ -634,7 +634,7 @@ function generate(){
                     usahaVal = Math.floor((w.usahaTotal || 0) / (days * 1.5));
                 }
                 
-                S.p[v.name][d].items[k]??={
+                S.p[v.name][d].items[k] = {
                     sls:w.sls,
                     ppl:w.ppl,
                     assignment: assignVal,
@@ -642,7 +642,7 @@ function generate(){
                     keluarga: keluargaVal,
                     bangunan: bangunanVal,
                     usaha: usahaVal,
-                    notes:""
+                    notes: S.p[v.name][d].items[k] ? S.p[v.name][d].items[k].notes || "" : ""
                 };
             });
         });
@@ -656,7 +656,6 @@ function generate(){
     $("progress").classList.remove("hidden");
     $("status").innerHTML = '<div class="status">✅ Form progres dan dokumentasi berhasil digenerate.</div>';
 }
-
 // ===== PROGRESS =====
 function setVal(v,d,k,f,val){S.p[v][d].items[k][f]=val}
 
