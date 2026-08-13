@@ -354,7 +354,7 @@ function uploadFileToCloudinary(file, isImage, callback) {
 // ===== FUNGSI TANGGAL =====
 function fmt(x){
     if(!x) return "";
-    let d = new Date(x + "T00:00:00");
+    let d = new Date(x + "T12:00:00"); // PERBAIKAN DI SINI
     if(isNaN(d.getTime())) return "";
     return d.toLocaleDateString("id-ID", {day:"numeric", month:"long", year:"numeric"});
 }
@@ -889,7 +889,7 @@ function generateNarrativeTable(){
         let jabatanAparat = aparatData && aparatData.jabatan ? aparatData.jabatan : "Kepala Kampung";
         
         let ds = Object.keys(S.p[v.name]||{}).sort();
-        let firstDay = true;
+        let firstDayInThisKampung = true;
         let isLastKampung = (vi === totalKampung - 1);
         
         ds.forEach((d, di) => {
@@ -900,25 +900,36 @@ function generateNarrativeTable(){
             out += `<p style="margin-top:12pt;margin-bottom:0pt;text-align:justify;"><b>${fmt(d)}</b></p>`;
             out += `<ul style="margin-top:3pt;margin-bottom:0pt;padding-left:20pt;text-align:justify;">`;
             
-            // NARASI KHUSUS HARI PERTAMA DI SETIAP KAMPUNG
+            // =======================================================
+            // NARASI HARI PERTAMA DI SETIAP KAMPUNG
+            // =======================================================
             if (isFirstDayInKampung) {
+                // ---- Kasus: Hari pertama di Kampung 1 ----
                 if (vi === 0) {
                     out += `<li style="text-align:justify;margin-bottom:3pt;">Tim berangkat dari Waisai menuju ${esc(v.name)}, Distrik ${esc(v.distrik)}, menggunakan transportasi perahu motor. Tim tiba di kampung tujuan dan mempersiapkan pelaksanaan pendataan lapangan.</li>`;
                     out += `<li style="text-align:justify;margin-bottom:3pt;">Tim menemui Bapak ${esc(namaAparat)} selaku ${esc(jabatanAparat)} ${esc(v.name)}.</li>`;
                     out += `<li style="text-align:justify;margin-bottom:3pt;">Tim meminta visum Surat Tugas serta menyampaikan maksud dan tujuan pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026 kepada aparat kampung.</li>`;
                     out += `<li style="text-align:justify;margin-bottom:3pt;">Setelah memperoleh izin, masing-masing petugas menuju wilayah tugas untuk melakukan penelusuran wilayah.</li>`;
-                } else {
-                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melakukan check ulang dan memastikan data kampung sebelumnya (${esc(vs[vi-1].name)}) sebelum melakukan perpindahan.</li>`;
-                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melakukan perjalanan dari ${esc(vs[vi-1].name)} menuju ${esc(v.name)}, Distrik ${esc(v.distrik)}. Setelah tiba, tim melakukan koordinasi dengan aparat kampung untuk izin dan persiapan pelaksanaan pendataan.</li>`;
+                } 
+                // ---- Kasus: Hari pertama di Kampung 2, 3, dst. ----
+                else {
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melakukan check assignment kampung sebelumnya (${esc(vs[vi-1].name)}) dan mempersiapkan keberangkatan menuju ${esc(v.name)}, Distrik ${esc(v.distrik)}.</li>`;
+                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melakukan perjalanan dari ${esc(vs[vi-1].name)} menuju ${esc(v.name)}. Setelah tiba, tim melakukan koordinasi dengan aparat kampung untuk izin dan persiapan pelaksanaan pendataan.</li>`;
                     out += `<li style="text-align:justify;margin-bottom:3pt;">Tim menemui Bapak ${esc(namaAparat)} selaku ${esc(jabatanAparat)} ${esc(v.name)}.</li>`;
                     out += `<li style="text-align:justify;margin-bottom:3pt;">Tim meminta visum Surat Tugas serta menyampaikan maksud dan tujuan pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026 kepada aparat kampung.</li>`;
                     out += `<li style="text-align:justify;margin-bottom:3pt;">Setelah memperoleh izin, masing-masing petugas menuju wilayah tugas untuk melakukan penelusuran wilayah.</li>`;
                 }
-            } else {
+            } 
+            // =======================================================
+            // NARASI HARI KEDUA SAMPAI HARI TERAKHIR (SEBELUM PENUTUPAN)
+            // =======================================================
+            else {
                 out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melanjutkan kegiatan pendataan door to door pada wilayah tugas masing-masing.</li>`;
             }
             
+            // =======================================================
             // DATA PROGRES PER PPL (Untuk SEMUA Hari)
+            // =======================================================
             Object.values(S.p[v.name][d].items).forEach(x => {
                 let a = +x.assignment || 0, b = +x.bku || 0, k = +x.keluarga || 0, bl = +x.bangunan || 0, u = +x.usaha || 0;
                 if (!a && !b && !k && !bl && !u && !x.notes) {
@@ -933,25 +944,21 @@ function generateNarrativeTable(){
                 out += `<li style="text-align:justify;margin-bottom:3pt;">PPL ${esc(x.ppl)} melakukan pendataan di SLS ${esc(x.sls)} dan berhasil mendata serta submit sebanyak <b>${a}</b> assignment${detail} Total usaha yang ditemukan sebanyak <b>${u}</b> usaha.${x.notes ? " " + esc(x.notes) : ""}</li>`;
             });
             
-            // NARASI KHUSUS HARI TERAKHIR KAMPUNG
-            if (isLastDayInKampung) {
-                if (isFinalDay) {
-                    out += `<li style="text-align:justify;margin-bottom:3pt;">Petugas melakukan check ulang dan memastikan isian kampung terakhir (${esc(v.name)}) sebelum kembali ke Waisai.</li>`;
-                    out += `<li style="text-align:justify;margin-bottom:3pt;">Petugas melakukan pengecekan administrasi dan kelengkapan hasil pendataan sebagai tahap akhir kegiatan lapangan.</li>`;
-                    out += `<li style="text-align:justify;margin-bottom:3pt;">Setelah seluruh hasil pendataan dinyatakan lengkap, tim mempersiapkan keberangkatan kembali menuju Waisai.</li>`;
-                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim meninggalkan Kampung ${esc(v.name)} dan melakukan perjalanan kembali ke Waisai.</li>`;
-                    
-                    let tglAwal = document.getElementById('tanggalAwal').value.trim();
-                    let tglAkhir = document.getElementById('tanggalAkhir').value.trim();
-                    let tglAwalDisplay = tglAwal || S.tanggalAwal ? formatTanggalRange(S.tanggalAwal, S.tanggalAkhir) : '';
-                    let rangeText = tglAwalDisplay || `${fmt(S.tanggalAwal)} sampai ${fmt(S.tanggalAkhir)}`;
-                    
-                    out += `<li style="text-align:justify;margin-bottom:3pt;">Dengan keberangkatan tersebut, rangkaian kegiatan pendataan lapangan pada periode ${rangeText} dinyatakan selesai.</li>`;
-                } else {
-                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melakukan check ulang dan memastikan isian kampung ${esc(v.name)} sebelum melakukan perpindahan ke kampung berikutnya.</li>`;
-                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melakukan pengecekan administrasi dan kelengkapan hasil pendataan pada Kampung ${esc(v.name)}.</li>`;
-                    out += `<li style="text-align:justify;margin-bottom:3pt;">Tim mempersiapkan perpindahan dan keberangkatan menuju Kampung ${esc(vs[vi+1].name)}.</li>`;
-                }
+            // =======================================================
+            // NARASI KHUSUS HARI TERAKHIR DI KAMPUNG TERAKHIR (PULANG)
+            // =======================================================
+            if (isFinalDay) {
+                out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melakukan check assignment dan memastikan isian kampung terakhir (${esc(v.name)}) sebelum kembali ke Waisai.</li>`;
+                out += `<li style="text-align:justify;margin-bottom:3pt;">Petugas melakukan pengecekan administrasi dan kelengkapan hasil pendataan sebagai tahap akhir kegiatan lapangan.</li>`;
+                out += `<li style="text-align:justify;margin-bottom:3pt;">Setelah seluruh hasil pendataan dinyatakan lengkap, tim mempersiapkan keberangkatan kembali menuju Waisai.</li>`;
+                out += `<li style="text-align:justify;margin-bottom:3pt;">Tim meninggalkan Kampung ${esc(v.name)} dan melakukan perjalanan kembali ke Waisai.</li>`;
+                
+                let tglAwal = document.getElementById('tanggalAwal').value.trim();
+                let tglAkhir = document.getElementById('tanggalAkhir').value.trim();
+                let tglAwalDisplay = tglAwal || S.tanggalAwal ? formatTanggalRange(S.tanggalAwal, S.tanggalAkhir) : '';
+                let rangeText = tglAwalDisplay || `${fmt(S.tanggalAwal)} sampai ${fmt(S.tanggalAkhir)}`;
+                
+                out += `<li style="text-align:justify;margin-bottom:3pt;">Dengan keberangkatan tersebut, rangkaian kegiatan pendataan lapangan pada periode ${rangeText} dinyatakan selesai.</li>`;
             }
             
             out += `</ul>`;
