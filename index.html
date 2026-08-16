@@ -1078,18 +1078,15 @@ function importLegacyCSV(text) {
 
 // ===== FUNGSI DOWNLOAD YANG LEBIH STABIL UNTUK MOBILE =====
 function downloadFile(blob, fileName) {
-    // Coba gunakan msSaveBlob (untuk IE/Edge lama)
     if (navigator.msSaveBlob) {
         navigator.msSaveBlob(blob, fileName);
         return true;
     }
-    // Fallback standar
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
-    // Hapus setelah beberapa saat agar tidak mengganggu
     setTimeout(() => {
         document.body.removeChild(link);
         URL.revokeObjectURL(link.href);
@@ -1106,14 +1103,11 @@ function generateFileName(ext) {
     return `Laporan_${nama}_${tgl}_${jam}.${ext}`;
 }
 
-// ===== EXPORT EXCEL (dengan fallback CSV otomatis) =====
 function exportExcel() {
-    // Validasi data dasar
     if (S.wilayah.length === 0) {
         alert('⚠️ Data wilayah tugas kosong. Silakan isi data dan klik "Generate Form" terlebih dahulu.');
         return;
     }
-    // Coba library XLSX
     let useXLSX = false;
     try {
         useXLSX = (typeof XLSX !== 'undefined' && typeof XLSX.utils !== 'undefined');
@@ -1121,10 +1115,8 @@ function exportExcel() {
 
     if (useXLSX) {
         try {
-            // --- Membuat workbook Excel ---
             let wb = XLSX.utils.book_new();
 
-            // Sheet DATA UTAMA
             let utamaData = [
                 ["Nama Petugas","Tujuan","Tanggal Awal","Tanggal Akhir","Perihal","Nomor Surat Tugas"]
             ];
@@ -1140,7 +1132,6 @@ function exportExcel() {
             let wsUtama = XLSX.utils.aoa_to_sheet(utamaData);
             XLSX.utils.book_append_sheet(wb, wsUtama, "DATA UTAMA");
 
-            // Sheet KAMPUNG
             let kampungData = [["Kampung","Distrik","Mengetahui","Jabatan"]];
             S.kampung.forEach(k => {
                 kampungData.push([k.kampung||'', k.distrik||'', k.mengetahui||'', k.jabatan||'']);
@@ -1148,7 +1139,6 @@ function exportExcel() {
             let wsKampung = XLSX.utils.aoa_to_sheet(kampungData);
             XLSX.utils.book_append_sheet(wb, wsKampung, "KAMPUNG");
 
-            // Sheet WILAYAH
             let wilayahData = [["Kampung","SLS","PPL","Tanggal Awal","Tanggal Akhir","AssignmentTotal","BKUTotal","KeluargaTotal","BangunanTotal","UsahaTotal"]];
             S.wilayah.forEach(w => {
                 wilayahData.push([
@@ -1161,9 +1151,8 @@ function exportExcel() {
             let wsWilayah = XLSX.utils.aoa_to_sheet(wilayahData);
             XLSX.utils.book_append_sheet(wb, wsWilayah, "WILAYAH");
 
-            // Sheet PROGRES (jika ada)
             let progresData = [["Kampung","Tanggal","SLS","PPL","Assignment","BKU","Keluarga","Bangunan Lainnya","Usaha","Catatan"]];
-            let vs = group(); // sudah pasti tidak error karena S.wilayah ada
+            let vs = group();
             vs.forEach(v => {
                 let ds = Object.keys(S.p[v.name] || {}).sort();
                 ds.forEach(d => {
@@ -1179,12 +1168,11 @@ function exportExcel() {
                     });
                 });
             });
-            if (progresData.length > 1) { // ada data
+            if (progresData.length > 1) {
                 let wsProgres = XLSX.utils.aoa_to_sheet(progresData);
                 XLSX.utils.book_append_sheet(wb, wsProgres, "PROGRES");
             }
 
-            // Sheet DOKUMENTASI
             let dokumenData = [["Kampung","Cloudinary_URL","Caption"]];
             vs.forEach(v => {
                 let photos = S.photos[v.name] || [];
@@ -1199,7 +1187,6 @@ function exportExcel() {
             let wsDokumen = XLSX.utils.aoa_to_sheet(dokumenData);
             XLSX.utils.book_append_sheet(wb, wsDokumen, "DOKUMENTASI");
 
-            // Sheet BACKUP WORD
             let backupData = [["Nama_File","URL","Tanggal","Dibuat_Oleh"]];
             if (S.wordBackupUrl && S.wordBackupUrl.length > 0) {
                 S.wordBackupUrl.forEach(w => {
@@ -1211,28 +1198,22 @@ function exportExcel() {
             let wsBackup = XLSX.utils.aoa_to_sheet(backupData);
             XLSX.utils.book_append_sheet(wb, wsBackup, "BACKUP");
 
-            // Tulis file
             let wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
             let blob = new Blob([wbout], { type: 'application/octet-stream' });
             let namaFile = generateFileName('xlsx');
             downloadFile(blob, namaFile);
             $("status").innerHTML = '<div class="status" style="background:#d4edda; border-color:#28a745;">✅ Backup Excel berhasil diunduh!</div>';
-            return; // sukses
+            return;
         } catch (e) {
             console.warn('Gagal membuat Excel, beralih ke CSV:', e);
-            // lanjut ke fallback
         }
     }
-
-    // === FALLBACK: selalu gunakan CSV ===
     fallbackExportCSV();
 }
 
-// ===== FALLBACK CSV (PASTI JALAN) =====
 function fallbackExportCSV() {
     try {
         let rows = [];
-        // Header utama
         rows.push('=== DATA UTAMA ===');
         rows.push('Nama Petugas,' + S.petugas.filter(p=>p.trim()).join('; '));
         rows.push('Tujuan,' + S.tujuan);
@@ -1312,10 +1293,9 @@ function fallbackExportCSV() {
 }
 
 // ============================================================
-// ===== AKHIR BAGIAN YANG DIPERBAIKI =========================
+// ===== IMPORT EXCEL (DIPERBAIKI - FLEKSIBEL NAMA SHEET) =====
 // ============================================================
 
-// ===== IMPORT EXCEL / CSV (DIPERBAIKI) =====
 function importExcel(event){
     let file = event.target.files[0];
     if (!file) {
@@ -1326,39 +1306,12 @@ function importExcel(event){
     let isCSV = file.name.toLowerCase().endsWith('.csv');
 
     if (isCSV) {
-        // Baca sebagai teks
         let reader = new FileReader();
         reader.onload = function(e) {
             try {
                 let text = e.target.result;
                 importLegacyCSV(text);
-                // Refresh UI
-                renderPetugas();
-                document.getElementById('tujuan').value = S.tujuan || "";
-                if (S.tanggalAwal) {
-                    let parts = S.tanggalAwal.split('-');
-                    if (parts.length === 3) {
-                        document.getElementById('tanggalAwal').value = `${parts[2]}/${parts[1]}/${parts[0]}`;
-                    }
-                }
-                if (S.tanggalAkhir) {
-                    let parts = S.tanggalAkhir.split('-');
-                    if (parts.length === 3) {
-                        document.getElementById('tanggalAkhir').value = `${parts[2]}/${parts[1]}/${parts[0]}`;
-                    }
-                }
-                document.getElementById('perihal').value = S.perihal || "Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026";
-                document.getElementById('nomorSurat').value = S.nomorSurat || "";
-                renderKampung();
-                renderWilayah();
-                if (Object.keys(S.p).length > 0) {
-                    $("progress").classList.remove("hidden");
-                    renderProgress();
-                }
-                renderDokumentasi();
-                let totalPhotos = Object.values(S.photos).reduce((acc, arr) => acc + arr.length, 0);
-                $("status").innerHTML = `<div class="status">✅ Berhasil restore data dari CSV!<br>👤 Petugas: ${S.petugas.length} orang<br>🏠 Kampung: ${S.kampung.length}<br>📋 Wilayah: ${S.wilayah.length}<br>📸 Dokumentasi: ${totalPhotos} gambar</div>`;
-                save();
+                refreshUIAfterImport();
             } catch (err) {
                 alert('Error saat membaca CSV: ' + err.message);
                 console.error(err);
@@ -1369,11 +1322,10 @@ function importExcel(event){
         return;
     }
 
-    // --- Bukan CSV, baca sebagai Excel (ArrayBuffer) ---
+    // --- Baca sebagai Excel ---
     let reader = new FileReader();
     reader.onload = function(e) {
         try {
-            // Cek apakah library XLSX tersedia
             if (typeof XLSX === 'undefined' || typeof XLSX.utils === 'undefined') {
                 alert('Library Excel tidak tersedia. Pastikan koneksi internet aktif, atau gunakan file CSV.');
                 return;
@@ -1382,9 +1334,19 @@ function importExcel(event){
             let data = new Uint8Array(e.target.result);
             let workbook = XLSX.read(data, { type: 'array' });
 
-            function getSheetData(sheetName) {
+            function findSheetByKeyword(keyword) {
+                let sheetNames = workbook.SheetNames;
+                let exact = sheetNames.find(name => name === keyword);
+                if (exact) return exact;
+                let lowerKeyword = keyword.toLowerCase();
+                let found = sheetNames.find(name => name.toLowerCase().includes(lowerKeyword));
+                return found || null;
+            }
+
+            function getSheetDataByKeyword(keyword) {
+                let sheetName = findSheetByKeyword(keyword);
+                if (!sheetName) return [];
                 let sheet = workbook.Sheets[sheetName];
-                if (!sheet) return [];
                 return XLSX.utils.sheet_to_json(sheet);
             }
 
@@ -1400,9 +1362,9 @@ function importExcel(event){
             }
 
             // DATA UTAMA
-            let utama = getSheetData('DATA UTAMA');
-            if (utama.length > 0) {
-                let row = utama[0];
+            let utamaData = getSheetDataByKeyword('DATA UTAMA');
+            if (utamaData.length > 0) {
+                let row = utamaData[0];
                 let petugasRaw = row['Nama Petugas'] || '';
                 S.petugas = petugasRaw ? petugasRaw.split(';').map(p => p.trim()).filter(Boolean) : [''];
                 if (S.petugas.length === 0) S.petugas = [''];
@@ -1414,7 +1376,7 @@ function importExcel(event){
             }
 
             // KAMPUNG
-            let kampungData = getSheetData('KAMPUNG TUJUAN');
+            let kampungData = getSheetDataByKeyword('KAMPUNG');
             S.kampung = kampungData.map(k => ({
                 kampung: k['Kampung'] || '',
                 distrik: k['Distrik'] || '',
@@ -1423,11 +1385,11 @@ function importExcel(event){
             }));
 
             // WILAYAH
-            let wilayahData = getSheetData('WILAYAH TUGAS');
+            let wilayahData = getSheetDataByKeyword('WILAYAH');
             S.wilayah = wilayahData.map(w => ({
                 kampung: w['Kampung'] || '',
                 sls: w['SLS'] || '',
-                ppl: w['Nama PPL'] || '',
+                ppl: w['PPL'] || w['Nama PPL'] || '',
                 start: parseExcelDate(w['Tanggal Awal']),
                 end: parseExcelDate(w['Tanggal Akhir']),
                 assignmentTotal: parseInt(w['AssignmentTotal']) || 0,
@@ -1437,8 +1399,8 @@ function importExcel(event){
                 usahaTotal: parseInt(w['UsahaTotal']) || 0
             }));
 
-            // PROGRES
-            let progresData = getSheetData('DATA PROGRES');
+            // PROGRES (jika ada)
+            let progresData = getSheetDataByKeyword('PROGRES');
             S.p = {};
             progresData.forEach(row => {
                 let kampung = row['Kampung'] || '';
@@ -1462,11 +1424,11 @@ function importExcel(event){
             });
 
             // DOKUMENTASI
-            let dokumenData = getSheetData('DOKUMENTASI');
+            let dokumenData = getSheetDataByKeyword('DOKUMENTASI');
             S.photos = {};
             dokumenData.forEach(row => {
                 let kampung = row['Kampung'] || '';
-                let src = row['Cloudinary_URL_Gambar'] || '';
+                let src = row['Cloudinary_URL'] || row['Cloudinary_URL_Gambar'] || '';
                 let caption = row['Caption'] || '';
                 if (kampung && src) {
                     if (!S.photos[kampung]) S.photos[kampung] = [];
@@ -1475,41 +1437,15 @@ function importExcel(event){
             });
 
             // BACKUP WORD
-            let backupWordData = getSheetData('BACKUP WORD');
-            S.wordBackupUrl = backupWordData.map(w => ({
+            let backupData = getSheetDataByKeyword('BACKUP');
+            S.wordBackupUrl = backupData.map(w => ({
                 name: w['Nama_File'] || '',
-                file: w['Cloudinary_Word_URL'] || '',
-                date: w['Tanggal_Dibuat'] || '',
-                createdBy: w['Dibuat_oleh'] || ''
+                file: w['URL'] || w['Cloudinary_Word_URL'] || '',
+                date: w['Tanggal'] || w['Tanggal_Dibuat'] || '',
+                createdBy: w['Dibuat_Oleh'] || ''
             }));
 
-            // Refresh UI
-            renderPetugas();
-            document.getElementById('tujuan').value = S.tujuan || "";
-            if (S.tanggalAwal) {
-                let parts = S.tanggalAwal.split('/');
-                if (parts.length === 3) {
-                    document.getElementById('tanggalAwal').value = `${parts[0]}/${parts[1]}/${parts[2]}`;
-                }
-            }
-            if (S.tanggalAkhir) {
-                let parts = S.tanggalAkhir.split('/');
-                if (parts.length === 3) {
-                    document.getElementById('tanggalAkhir').value = `${parts[0]}/${parts[1]}/${parts[2]}`;
-                }
-            }
-            document.getElementById('perihal').value = S.perihal || "Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026";
-            document.getElementById('nomorSurat').value = S.nomorSurat || "";
-            renderKampung();
-            renderWilayah();
-            if (Object.keys(S.p).length > 0) {
-                $("progress").classList.remove("hidden");
-                renderProgress();
-            }
-            renderDokumentasi();
-            let totalPhotos = Object.values(S.photos).reduce((acc, arr) => acc + arr.length, 0);
-            $("status").innerHTML = `<div class="status">✅ Berhasil restore data dari Excel!<br>👤 Petugas: ${S.petugas.length} orang<br>🏠 Kampung: ${S.kampung.length}<br>📋 Wilayah: ${S.wilayah.length}<br>📸 Dokumentasi: ${totalPhotos} gambar</div>`;
-            save();
+            refreshUIAfterImport();
 
         } catch (err) {
             alert('Error saat membaca Excel: ' + err.message);
@@ -1518,6 +1454,36 @@ function importExcel(event){
     };
     reader.readAsArrayBuffer(file);
     event.target.value = '';
+}
+
+// Fungsi pembantu untuk refresh UI setelah import
+function refreshUIAfterImport() {
+    renderPetugas();
+    document.getElementById('tujuan').value = S.tujuan || "";
+    if (S.tanggalAwal) {
+        let parts = S.tanggalAwal.split('/');
+        if (parts.length === 3) {
+            document.getElementById('tanggalAwal').value = `${parts[0]}/${parts[1]}/${parts[2]}`;
+        }
+    }
+    if (S.tanggalAkhir) {
+        let parts = S.tanggalAkhir.split('/');
+        if (parts.length === 3) {
+            document.getElementById('tanggalAkhir').value = `${parts[0]}/${parts[1]}/${parts[2]}`;
+        }
+    }
+    document.getElementById('perihal').value = S.perihal || "Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026";
+    document.getElementById('nomorSurat').value = S.nomorSurat || "";
+    renderKampung();
+    renderWilayah();
+    if (Object.keys(S.p).length > 0) {
+        document.getElementById('progress').classList.remove('hidden');
+        renderProgress();
+    }
+    renderDokumentasi();
+    let totalPhotos = Object.values(S.photos).reduce((acc, arr) => acc + arr.length, 0);
+    document.getElementById('status').innerHTML = `<div class="status">✅ Berhasil restore data dari Excel!<br>👤 Petugas: ${S.petugas.length} orang<br>🏠 Kampung: ${S.kampung.length}<br>📋 Wilayah: ${S.wilayah.length}<br>📸 Dokumentasi: ${totalPhotos} gambar</div>`;
+    save();
 }
 
 // ===== INISIALISASI =====
