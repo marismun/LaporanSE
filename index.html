@@ -814,7 +814,7 @@ function generateWordHTML(resizedImages) {
             if(index===0) docHtml += `<div style="margin-top:0;margin-bottom:0;"><!--[if gte mso 9]><br clear="all" style="mso-break-type:section-break;page-break-before:always;"><![endif]-->`; 
             else docHtml += `<div style="margin-top:0;margin-bottom:0;"><!--[if gte mso 9]><br clear="all" style="mso-break-type:section-break;page-break-before:always;"><![endif]-->`;
             docHtml += `<table style="width:100%;border-collapse:collapse;border:none;mso-table-lspace:0;mso-table-rspace:0;margin-top:0;margin-bottom:0;">`;
-            docHtml += `<tr><td style="border:none;padding:0;text-align:center;vertical-align:top;mso-line-height-rule:exactly;"><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">DOKUMENTASI PERJALANAN DINAS PELAKSANAAN LAPANGAN</p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">SENSUS EKONOMI 2026</p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">${esc(v.name).toUpperCase()}</p></td></tr>`;
+            docHtml += `<tr><td style="border:none;padding:0;text-align:center;vertical-align:top;mso-line-height-rule:exactly;"><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">DOKUMENTASI PERJALANAN DINAS PELAKSANAAN LAPANGAN</p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">SENSUS EKONOMI 2026</p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">KAMPUNG ${esc(v.name).toUpperCase()}</p></td></tr>`;
             photos.forEach((p,idx)=>{ if(p.src){ let imgSrc=p.src; let key=v.name+'_'+idx; if(resizedImages&&resizedImages[key]) imgSrc=resizedImages[key]; docHtml+=`<tr><td style="border:none;padding:10px 0;text-align:center;vertical-align:top;"><img src="${imgSrc}" style="height:347pt;width:auto;max-width:100%;object-fit:contain;border:1px solid #cccccc;border-radius:4px;display:block;margin:0 auto;mso-height-rule:exactly;">${p.caption?`<p style="text-align:center;font-size:10pt;margin-top:5px;margin-bottom:0;padding:0;font-style:italic;">${esc(p.caption)}</p>`:''}</td></tr>`; } });
             docHtml += `</table></div>`;
         }
@@ -861,12 +861,82 @@ function word(){
 }
 
 // ===== GENERATE WORD (DOWNLOAD + UPLOAD KE GOOGLE DRIVE) =====
-function generateOfflineWord(resizedImages){
+function generateOfflineWord(resizedImages) {
     try {
         let htmlContent = generateWordHTML(resizedImages);
-        let blob = new Blob(["\ufeff" + htmlContent], { type: "application/msword;charset=utf-8" });
+        
+        // ===== BIKIN WORD YANG VALID =====
+        const fullHtml = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" 
+      xmlns:w="urn:schemas-microsoft-com:office:word" 
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <!--[if gte mso 9]>
+    <xml>
+        <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:Zoom>100</w:Zoom>
+            <w:DoNotOptimizeForBrowser/>
+        </w:WordDocument>
+    </xml>
+    <![endif]-->
+    <style>
+        /* ===== STYLE UNTUK WORD ===== */
+        @page {
+            size: 21cm 29.7cm;
+            margin-top: 2cm;
+            margin-right: 2cm;
+            margin-bottom: 2cm;
+            margin-left: 2cm;
+            mso-page-orientation: portrait;
+        }
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 12pt;
+            line-height: 1.5;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 12pt;
+        }
+        td {
+            border: 1px solid #000000;
+            padding: 8px;
+            vertical-align: top;
+        }
+        p {
+            text-align: justify;
+            margin: 0 0 6pt 0;
+        }
+        ul {
+            margin-top: 3pt;
+            margin-bottom: 0pt;
+            padding-left: 20pt;
+        }
+        li {
+            text-align: justify;
+            margin-bottom: 3pt;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    ${htmlContent}
+</body>
+</html>`;
 
-        let ppl = S.petugas.filter(p=>p.trim());
+        let blob = new Blob(["\ufeff" + fullHtml], { 
+            type: "application/msword;charset=utf-8" 
+        });
+
+        let ppl = S.petugas.filter(p => p.trim());
         let namaPpl = ppl.length > 0 ? ppl[0] : "TanpaNama";
         let tanggalSekarang = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }).replace(/\s/g, "_");
         let fileName = `Laporan_Perjalanan_Dinas_Tim_${namaPpl}_${tanggalSekarang}.doc`;
@@ -883,10 +953,9 @@ function generateOfflineWord(resizedImages){
         // ===== UPLOAD KE GOOGLE DRIVE =====
         $("status").innerHTML = '<div class="status">⏳ Mengupload file ke Google Drive...</div>';
         uploadToGoogleDrive(blob, fileName, function(data) {
-            // Sukses upload
             if (!S.wordBackupUrl) S.wordBackupUrl = [];
             S.wordBackupUrl.push({
-                file: data.url || 'https://drive.google.com/drive/folders/1NHPuExdyLSmjkXI4jiaVaaM_kwnC4_8N',
+                file: 'https://drive.google.com/drive/folders/1NHPuExdyLSmjkXI4jiaVaaM_kwnC4_8N',
                 date: new Date().toISOString(),
                 name: fileName,
                 createdBy: namaPpl
@@ -897,7 +966,6 @@ function generateOfflineWord(resizedImages){
             </div>`;
             save();
         }, function(error) {
-            // Error upload: hanya catat di console
             console.error("Upload Google Drive gagal:", error);
             $("status").innerHTML = `<div class="status" style="background:#f8d7da; border-color:#dc3545;">
                 ⚠️ File Word berhasil didownload, tetapi upload ke Google Drive gagal.<br>
