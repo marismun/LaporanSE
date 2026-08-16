@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Generator Laporan Pendataan BPS</title>
 <style>
+/* ... CSS SAMA SEPERTI SEBELUMNYA ... */
 :root {
     --primary-navy: #0C3B63;
     --primary-light: #E3F0F8;
@@ -282,17 +283,15 @@ const S = {
 const $ = id => document.getElementById(id);
 const esc = x => String(x ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 
-// ===================== FUNGSI TANGGAL (DIPERBAIKI) =====================
+// ===================== FUNGSI TANGGAL =====================
 function toDateObj(dateStr) {
     if (!dateStr) return null;
     let s = dateStr.trim();
-    // Coba format dd/mm/yyyy
     let parts = s.split('/');
     if (parts.length !== 3) return null;
     let d1 = parseInt(parts[0], 10);
     let m1 = parseInt(parts[1], 10) - 1;
     let y1 = parseInt(parts[2], 10);
-    // Coba sebagai dd/mm/yyyy
     let date = new Date(y1, m1, d1);
     if (!isNaN(date.getTime()) && date.getDate() === d1 && date.getMonth() === m1 && date.getFullYear() === y1) {
         return date;
@@ -355,6 +354,22 @@ function validateDateFormat(input) {
         input.style.borderColor = 'red';
         setTimeout(() => input.style.borderColor = '', 3000);
     }
+}
+
+// ===== FUNGSI PARSING TANGGAL KHUSUS UNTUK CSV (mm/dd/yyyy) =====
+function parseDateFromCSV(dateStr) {
+    if (!dateStr) return '';
+    let s = dateStr.trim();
+    let parts = s.split('/');
+    if (parts.length !== 3) return s;
+    // Asumsi input adalah mm/dd/yyyy
+    let month = parseInt(parts[0], 10) - 1;
+    let day = parseInt(parts[1], 10);
+    let year = parseInt(parts[2], 10);
+    if (isNaN(month) || isNaN(day) || isNaN(year)) return s;
+    let d = new Date(year, month, day);
+    if (isNaN(d.getTime())) return s;
+    return formatDateObj(d); // ubah ke dd/mm/yyyy
 }
 
 // ===================== CLOUDINARY =====================
@@ -849,7 +864,6 @@ function importLegacyCSV(text) {
     let petugasRaw='', tujuanVal='', tanggalAwalVal='', tanggalAkhirVal='', perihalVal='', nomorSuratVal='';
     let kampungList=[], wilayahList=[], progressData={}, photoData={}, wordBackupData=[];
 
-    // Ambil header untuk wilayah dan progres jika ada
     let wilayahHeader = null;
     let progresHeader = null;
 
@@ -877,7 +891,6 @@ function importLegacyCSV(text) {
             }
         }
         else if (section === 'wilayah') {
-            // Ambil header jika belum
             if (!wilayahHeader) {
                 let header = parseCSVLine(line);
                 if (header.length >= 10 && header[0] === 'Kampung') {
@@ -885,10 +898,8 @@ function importLegacyCSV(text) {
                     continue;
                 }
             }
-            // Parse baris data
             let parts = parseCSVLine(line);
             if (parts.length < 10) continue;
-            // Coba cari posisi kolom berdasarkan header
             let idxKampung = wilayahHeader.indexOf('Kampung');
             let idxSLS = wilayahHeader.indexOf('SLS');
             let idxPPL = wilayahHeader.indexOf('Nama PPL') !== -1 ? wilayahHeader.indexOf('Nama PPL') : wilayahHeader.indexOf('PPL');
@@ -900,7 +911,6 @@ function importLegacyCSV(text) {
             let idxBangunan = wilayahHeader.indexOf('BangunanTotal');
             let idxUsaha = wilayahHeader.indexOf('UsahaTotal');
 
-            // Jika header tidak lengkap, fallback ke indeks standar
             if (idxKampung === -1) idxKampung = 0;
             if (idxSLS === -1) idxSLS = 1;
             if (idxPPL === -1) idxPPL = 2;
@@ -912,7 +922,6 @@ function importLegacyCSV(text) {
             if (idxBangunan === -1) idxBangunan = 8;
             if (idxUsaha === -1) idxUsaha = 9;
 
-            // Ambil nilai dengan indeks yang sudah ditentukan
             let kampung = parts[idxKampung] || '';
             let sls = parts[idxSLS] || '';
             let ppl = parts[idxPPL] || '';
@@ -924,16 +933,13 @@ function importLegacyCSV(text) {
             let bangunan = parseInt(parts[idxBangunan]) || 0;
             let usaha = parseInt(parts[idxUsaha]) || 0;
 
-            // Jika start kosong, coba cari di posisi lain (misal karena koma ekstra)
+            // Jika start kosong, cari tanggal di posisi lain
             if (!start && idxTglAwal < parts.length-1) {
-                // Coba scan ke kanan sampai dapat tanggal
                 for (let j = idxTglAwal; j < parts.length; j++) {
                     if (parts[j] && parts[j].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
                         start = parts[j];
-                        // Jika ketemu, cari end di sebelahnya
                         if (j+1 < parts.length && parts[j+1].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
                             end = parts[j+1];
-                            // Ambil nilai assignment setelah end
                             if (j+2 < parts.length) assign = parseInt(parts[j+2]) || 0;
                             if (j+3 < parts.length) bku = parseInt(parts[j+3]) || 0;
                             if (j+4 < parts.length) keluarga = parseInt(parts[j+4]) || 0;
@@ -946,13 +952,17 @@ function importLegacyCSV(text) {
             }
 
             if (kampung && sls && ppl && start && end) {
-                wilayahList.push({ kampung, sls, ppl, start: parseDate(start), end: parseDate(end),
+                // Gunakan parseDateFromCSV untuk mengubah mm/dd/yyyy ke dd/mm/yyyy
+                wilayahList.push({
+                    kampung, sls, ppl,
+                    start: parseDateFromCSV(start),
+                    end: parseDateFromCSV(end),
                     assignmentTotal: assign, bkuTotal: bku, keluargaTotal: keluarga,
-                    bangunanTotal: bangunan, usahaTotal: usaha });
+                    bangunanTotal: bangunan, usahaTotal: usaha
+                });
             }
         }
         else if (section === 'progres') {
-            // Ambil header progres jika belum
             if (!progresHeader) {
                 let header = parseCSVLine(line);
                 if (header.length >= 10 && header[0] === 'Kampung') {
@@ -996,7 +1006,7 @@ function importLegacyCSV(text) {
             let catatan = parts[idxCatatan] || '';
 
             if (!kampung || !tanggal) continue;
-            let parsedTanggal = parseDate(tanggal);
+            let parsedTanggal = parseDateFromCSV(tanggal); // konversi ke dd/mm/yyyy
             if (!parsedTanggal) continue;
 
             if (!progressData[kampung]) progressData[kampung] = {};
@@ -1029,8 +1039,9 @@ function importLegacyCSV(text) {
     if (petugasList.length === 0) petugasList = [''];
     S.petugas = petugasList;
     if (tujuanVal) S.tujuan = tujuanVal;
-    if (tanggalAwalVal) S.tanggalAwal = parseDate(tanggalAwalVal);
-    if (tanggalAkhirVal) S.tanggalAkhir = parseDate(tanggalAkhirVal);
+    // Untuk tanggal awal/akhir utama, gunakan parseDateFromCSV
+    if (tanggalAwalVal) S.tanggalAwal = parseDateFromCSV(tanggalAwalVal);
+    if (tanggalAkhirVal) S.tanggalAkhir = parseDateFromCSV(tanggalAkhirVal);
     if (perihalVal) S.perihal = perihalVal;
     if (nomorSuratVal) S.nomorSurat = nomorSuratVal;
     if (kampungList.length) S.kampung = kampungList;
@@ -1243,7 +1254,7 @@ function refreshUIAfterImport() {
     if(Object.keys(S.p).length>0){ document.getElementById('progress').classList.remove('hidden'); renderProgress(); }
     renderDokumentasi();
     let totalPhotos = Object.values(S.photos).reduce((acc,arr)=>acc+arr.length,0);
-    document.getElementById('status').innerHTML = `<div class="status">✅ Berhasil restore data dari Excel!<br>👤 Petugas: ${S.petugas.length} orang<br>🏠 Kampung: ${S.kampung.length}<br>📋 Wilayah: ${S.wilayah.length}<br>📸 Dokumentasi: ${totalPhotos} gambar</div>`;
+    document.getElementById('status').innerHTML = `<div class="status">✅ Berhasil restore data!<br>👤 Petugas: ${S.petugas.length} orang<br>🏠 Kampung: ${S.kampung.length}<br>📋 Wilayah: ${S.wilayah.length}<br>📸 Dokumentasi: ${totalPhotos} gambar</div>`;
     save();
 }
 
@@ -1257,4 +1268,4 @@ renderWilayah();
 renderDokumentasi();
 </script>
 </body>
-</html>
+    </html>
