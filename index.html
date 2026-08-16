@@ -415,30 +415,33 @@ function resizeImageToHeight(src, targetHeightCm, callback) {
 }
 
 // ===================== UPLOAD KE GOOGLE DRIVE =====================
-const GOOGLE_DRIVE_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxQeQt3NVy5xQpedNe2ClDeQmYk_7Kn6lF9zLPmxsi7WliTj-He78RElbrm4le4VNln/exec';
+const GOOGLE_DRIVE_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxxBKubFxUcfoWXr6Xh6MF4j67Sbquli3UO_qbscwdz_Cc1ZxzLFOkZ1FaIog8XkLcm/exec';
 
 function uploadToGoogleDrive(blob, fileName, onSuccess, onError) {
+    // Konversi Blob ke base64
     const reader = new FileReader();
     reader.onload = function() {
-        const base64Data = reader.result.split(',')[1] || reader.result;
+        // Ambil data base64 (tanpa header)
+        const base64Data = reader.result.split(',')[1];
         
-        const formData = new FormData();
-        formData.append('file', base64Data);
-        formData.append('fileName', fileName);
-        
-        // Kirim ke Google Apps Script dengan mode no-cors
+        // Kirim ke Google Apps Script
         fetch(GOOGLE_DRIVE_WEBAPP_URL, {
             method: 'POST',
-            body: formData,
-            mode: 'no-cors'
+            mode: 'no-cors',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                file: base64Data,
+                fileName: fileName
+            })
         })
         .then(() => {
             // Karena mode: no-cors, kita tidak bisa membaca response
-            // Anggap berhasil jika tidak ada error
+            // Tapi jika tidak ada error, anggap sukses
             if (onSuccess) {
                 onSuccess({
                     success: true,
-                    url: 'https://drive.google.com/drive/folders/1NHPuExdyLSmjkXI4jiaVaaM_kwnC4_8N',
                     message: 'File berhasil diupload! Cek Google Drive.'
                 });
             }
