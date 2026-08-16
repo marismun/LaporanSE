@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Generator Laporan Pendataan BPS</title>
+<!-- Library SheetJS untuk Excel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
     --primary-navy: #0C3B63;
@@ -198,11 +200,11 @@ footer{margin-top:30px;text-align:center;color:var(--text-gray);font-size:12px;b
 <div class="global-toolbar">
     <div class="toolbar-left">
         <span>📊 BPS</span>
-        <button class="btn btn-success" onclick="exportExcel()">📥 Backup</button>
-        <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">📤 Restore</button>
-        <input type="file" id="fileInput" accept=".csv" style="display:none" onchange="importExcel(event)">
-        <!-- TOMBOL MUAT DATA DARI BROWSER -->
-        <button class="btn btn-primary" onclick="load()">📂 Muat</button>
+        <button class="btn btn-success" onclick="exportExcel()">📥 Backup (.xlsx)</button>
+        <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">📤 Restore (.xlsx)</button>
+        <input type="file" id="fileInput" accept=".xlsx,.csv" style="display:none" onchange="importExcel(event)">
+        <button class="btn btn-outline" onclick="save()">💾 Simpan</button>
+        <button class="btn btn-outline" onclick="load()">📂 Muat</button>
         <button class="btn btn-danger" onclick="resetAll()">🗑 Hapus</button>
     </div>
     <div class="toolbar-right">
@@ -310,7 +312,7 @@ const S={
 const $=id=>document.getElementById(id);
 const esc=x=>String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 
-// ===== FUNGSI TANGGAL (LOGIKA BARU DENGAN DATE OBJECT) =====
+// ===== FUNGSI TANGGAL =====
 const dates=(startStr, endStr)=>{
     if(!startStr || !endStr) return [];
     let partsA = startStr.split('/');
@@ -1545,72 +1547,107 @@ function resetAll(){
 
 // ===== EXPORT EXCEL (BACKUP) =====
 function exportExcel(){
-    let rows = [];
-    rows.push('=== DATA UTAMA ===');
-    rows.push('Nama Petugas,' + S.petugas.filter(p => p.trim()).join('; '));
-    rows.push('Tujuan,' + S.tujuan);
-    rows.push('Tanggal Awal,' + S.tanggalAwal);
-    rows.push('Tanggal Akhir,' + S.tanggalAkhir);
-    rows.push('Perihal,' + S.perihal);
-    rows.push('Nomor Surat Tugas,' + S.nomorSurat);
-    rows.push('');
+    // Siapkan workbook baru
+    let wb = XLSX.utils.book_new();
     
-    rows.push('=== KAMPUNG TUJUAN ===');
-    rows.push('Kampung,Distrik,Mengetahui,Jabatan');
-    S.kampung.forEach(k => {rows.push(`${k.kampung},${k.distrik},${k.mengetahui},${k.jabatan}`);});
-    rows.push('');
+    // --- Sheet 1: DATA UTAMA ---
+    let utamaData = [[
+        "Nama Petugas", "Tujuan", "Tanggal Awal", "Tanggal Akhir", "Perihal", "Nomor Surat Tugas"
+    ]];
+    utamaData.push([
+        S.petugas.filter(p=>p.trim()).join('; '),
+        S.tujuan || '',
+        S.tanggalAwal || '',
+        S.tanggalAkhir || '',
+        S.perihal || '',
+        S.nomorSurat || ''
+    ]);
+    let wsUtama = XLSX.utils.aoa_to_sheet(utamaData);
+    XLSX.utils.book_append_sheet(wb, wsUtama, "DATA UTAMA");
     
-    rows.push('=== WILAYAH TUGAS ===');
-    rows.push('Kampung,SLS,Nama PPL,Tanggal Awal,Tanggal Akhir,AssignmentTotal,BKUTotal,KeluargaTotal,BangunanTotal,UsahaTotal');
-    S.wilayah.forEach(w => {
-        rows.push(`${w.kampung},${w.sls},${w.ppl},${formatDate(w.start)},${formatDate(w.end)},${w.assignmentTotal||0},${w.bkuTotal||0},${w.keluargaTotal||0},${w.bangunanTotal||0},${w.usahaTotal||0}`);
+    // --- Sheet 2: KAMPUNG TUJUAN ---
+    let kampungData = [[
+        "Kampung", "Distrik", "Mengetahui", "Jabatan"
+    ]];
+    S.kampung.forEach(k => {
+        kampungData.push([k.kampung||'', k.distrik||'', k.mengetahui||'', k.jabatan||'']);
     });
-    rows.push('');
+    let wsKampung = XLSX.utils.aoa_to_sheet(kampungData);
+    XLSX.utils.book_append_sheet(wb, wsKampung, "KAMPUNG TUJUAN");
     
-    rows.push('=== DATA PROGRES ===');
-    rows.push('Kampung,Tanggal,SLS,PPL,Assignment,BKU,Keluarga,Bangunan Lainnya,Usaha,Catatan SLS');
+    // --- Sheet 3: WILAYAH TUGAS ---
+    let wilayahData = [[
+        "Kampung", "SLS", "Nama PPL", "Tanggal Awal", "Tanggal Akhir", 
+        "AssignmentTotal", "BKUTotal", "KeluargaTotal", "BangunanTotal", "UsahaTotal"
+    ]];
+    S.wilayah.forEach(w => {
+        wilayahData.push([
+            w.kampung||'', w.sls||'', w.ppl||'', w.start||'', w.end||'',
+            w.assignmentTotal||0, w.bkuTotal||0, w.keluargaTotal||0, 
+            w.bangunanTotal||0, w.usahaTotal||0
+        ]);
+    });
+    let wsWilayah = XLSX.utils.aoa_to_sheet(wilayahData);
+    XLSX.utils.book_append_sheet(wb, wsWilayah, "WILAYAH TUGAS");
+    
+    // --- Sheet 4: DATA PROGRES ---
+    let progresData = [[
+        "Kampung", "Tanggal", "SLS", "PPL", "Assignment", "BKU", 
+        "Keluarga", "Bangunan Lainnya", "Usaha", "Catatan SLS"
+    ]];
     let vs = group();
     vs.forEach(v => {
         let ds = Object.keys(S.p[v.name]||{}).sort();
         ds.forEach(d => {
             Object.values(S.p[v.name][d].items).forEach(x => {
-                rows.push([v.name,fmt(d),x.sls,x.ppl,x.assignment||'0',x.bku||'0',x.keluarga||'0',x.bangunan||'0',x.usaha||'0',x.notes||''].join(','));
+                progresData.push([
+                    v.name, d, x.sls, x.ppl, x.assignment||'0', x.bku||'0',
+                    x.keluarga||'0', x.bangunan||'0', x.usaha||'0', x.notes||''
+                ]);
             });
         });
     });
-    rows.push('');
+    let wsProgres = XLSX.utils.aoa_to_sheet(progresData);
+    XLSX.utils.book_append_sheet(wb, wsProgres, "DATA PROGRES");
     
-    rows.push('=== DOKUMENTASI ===');
-    rows.push('Kampung,Cloudinary_URL_Gambar,Caption');
+    // --- Sheet 5: DOKUMENTASI ---
+    let dokumenData = [[
+        "Kampung", "Cloudinary_URL_Gambar", "Caption"
+    ]];
     vs.forEach(v => {
         let photos = S.photos[v.name] || [];
         photos.forEach(p => {
             if(p.src){
-                rows.push(`${v.name},"${p.src}",${p.caption||''}`);
+                dokumenData.push([v.name, p.src, p.caption||'']);
             }
         });
     });
     let perahuPhotos = S.photos["Perahu"] || [];
     perahuPhotos.forEach(p => {
         if(p.src){
-            rows.push(`Perahu,"${p.src}",${p.caption||''}`);
+            dokumenData.push(["Perahu", p.src, p.caption||'']);
         }
     });
+    let wsDokumen = XLSX.utils.aoa_to_sheet(dokumenData);
+    XLSX.utils.book_append_sheet(wb, wsDokumen, "DOKUMENTASI");
     
-    rows.push('');
-    rows.push('');
-    rows.push('=== BACKUP WORD ===');
-    rows.push('Nama_File,Cloudinary_Word_URL,Tanggal_Dibuat,Dibuat_oleh');
+    // --- Sheet 6: BACKUP WORD ---
+    let backupWordData = [[
+        "Nama_File", "Cloudinary_Word_URL", "Tanggal_Dibuat", "Dibuat_oleh"
+    ]];
     if(S.wordBackupUrl && S.wordBackupUrl.length > 0) {
-        (S.wordBackupUrl || []).forEach(w => {
-            rows.push(`"${w.name}","${w.file}",${w.date || ''},${w.createdBy || ''}`);
+        S.wordBackupUrl.forEach(w => {
+            backupWordData.push([w.name||'', w.file||'', w.date||'', w.createdBy||'']);
         });
     } else {
-        rows.push('"Belum ada backup","","",""');
+        backupWordData.push(["Belum ada backup", "", "", ""]);
     }
+    let wsBackup = XLSX.utils.aoa_to_sheet(backupWordData);
+    XLSX.utils.book_append_sheet(wb, wsBackup, "BACKUP WORD");
     
-    let csvContent = rows.join('\n');
-    let blob = new Blob(['\ufeff' + csvContent], {type: 'text/csv;charset=utf-8;'});
+    // --- Generate file Excel ---
+    let wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    let blob = new Blob([wbout], {type:'application/octet-stream'});
     let link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     
@@ -1620,180 +1657,161 @@ function exportExcel(){
     let now = new Date();
     let tgl = now.toLocaleDateString("id-ID", {day:"numeric", month:"short", year:"numeric"}).replace(/\s/g, "_");
     let jam = now.toLocaleTimeString("id-ID", {hour:"2-digit", minute:"2-digit", hour12:false}).replace(/:/g, ".");
-    link.download = `Laporan SE Tim ${ppl1} - ${tgl} - ${jam} WIT.csv`;
+    link.download = `Laporan SE Tim ${ppl1} - ${tgl} - ${jam} WIT.xlsx`;
     
     link.click();
     URL.revokeObjectURL(link.href);
-    $("status").innerHTML = '<div class="status">✅ Backup data lengkap berhasil diexport ke CSV.</div>';
+    $("status").innerHTML = '<div class="status">✅ Backup data lengkap berhasil diexport ke Excel (.xlsx).</div>';
 }
 
 // ===== IMPORT EXCEL (RESTORE) =====
 function importExcel(event){
     let file = event.target.files[0];
-    if(!file){alert('Pilih file Backup CSV terlebih dahulu.');return;}
+    if(!file){alert('Pilih file Backup (.xlsx atau .csv) terlebih dahulu.');return;}
     
     let reader = new FileReader();
     reader.onload = function(e){
         try{
-            let content = e.target.result;
-            let lines = content.split('\n').map(line => line.replace(/\r$/, '')).filter(line => line.trim() !== '');
-            if(lines.length < 2){alert('File kosong atau tidak valid.');return;}
+            let data = new Uint8Array(e.target.result);
+            let workbook = XLSX.read(data, {type: 'array'});
             
-            let section = '';
-            let petugasRaw = '', tujuanVal = '', tanggalAwalVal = '', tanggalAkhirVal = '', perihalVal = '', nomorSuratVal = '';
-            let kampungList = [], wilayahList = [];
-            let progressData = {}, photoData = {};
-            let wordBackupData = [];
-            let importedCount = 0;
-            
-            for(let i = 0; i < lines.length; i++){
-                let line = lines[i].trim();
-                if(line.startsWith('=== DATA UTAMA ===')){section='utama';continue;}
-                else if(line.startsWith('=== KAMPUNG TUJUAN ===')){section='kampung';continue;}
-                else if(line.startsWith('=== WILAYAH TUGAS ===')){section='wilayah';continue;}
-                else if(line.startsWith('=== DATA PROGRES ===')){section='progres';continue;}
-                else if(line.startsWith('=== DOKUMENTASI ===')){section='dokumentasi';continue;}
-                else if(line.startsWith('=== BACKUP WORD ===')){section='backup';continue;}
-                
-                if(section === 'utama'){
-                    if(line.startsWith('Nama Petugas,')) petugasRaw = line.substring('Nama Petugas,'.length).trim();
-                    else if(line.startsWith('Tujuan,')) tujuanVal = line.substring('Tujuan,'.length).trim();
-                    else if(line.startsWith('Tanggal Awal,')) tanggalAwalVal = line.substring('Tanggal Awal,'.length).trim();
-                    else if(line.startsWith('Tanggal Akhir,')) tanggalAkhirVal = line.substring('Tanggal Akhir,'.length).trim();
-                    else if(line.startsWith('Perihal,')) perihalVal = line.substring('Perihal,'.length).trim();
-                    else if(line.startsWith('Nomor Surat Tugas,')) nomorSuratVal = line.substring('Nomor Surat Tugas,'.length).trim();
-                }
-                else if(section === 'kampung'){
-                    let parts = line.split(',').map(c => c.trim());
-                    if(parts.length >= 4 && parts[0] && !parts[0].includes('Kampung')){
-                        kampungList.push({kampung:parts[0],distrik:parts[1]||'',mengetahui:parts[2]||'',jabatan:parts[3]||''});
-                    }
-                }
-                else if(section === 'wilayah'){
-                    let parts = line.split(',').map(c => c.trim());
-                    if(parts.length >= 10 && parts[0] && !parts[0].includes('Kampung')){
-                        wilayahList.push({
-                            kampung: parts[0],
-                            sls: parts[1],
-                            ppl: parts[2],
-                            start: parseDate(parts[3]) || '',
-                            end: parseDate(parts[4]) || '',
-                            assignmentTotal: parseInt(parts[5]) || 0,
-                            bkuTotal: parseInt(parts[6]) || 0,
-                            keluargaTotal: parseInt(parts[7]) || 0,
-                            bangunanTotal: parseInt(parts[8]) || 0,
-                            usahaTotal: parseInt(parts[9]) || 0
-                        });
-                    }
-                }
-                else if(section === 'progres'){
-                    let parts = line.split(',').map(c => c.trim());
-                    if(parts.length >= 10 && parts[0] && !parts[0].includes('Kampung')){
-                        let kampung=parts[0], tanggalStr=parts[1], sls=parts[2], ppl=parts[3];
-                        let dateObj = new Date(tanggalStr);
-                        if(isNaN(dateObj.getTime())){
-                            let parts2 = tanggalStr.split(' ');
-                            if(parts2.length === 3){
-                                let monthMap={'Januari':'01','Februari':'02','Maret':'03','April':'04','Mei':'05','Juni':'06','Juli':'07','Agustus':'08','September':'09','Oktober':'10','November':'11','Desember':'12'};
-                                let day=parts2[0].padStart(2,'0'), month=monthMap[parts2[1]]||'01', year=parts2[2];
-                                if(year.length===2) year='20'+year;
-                                tanggalStr=`${year}-${month}-${day}`;
-                            }
-                        } else {tanggalStr=dateObj.toISOString().split('T')[0];}
-                        
-                        if(!progressData[kampung]) progressData[kampung]={};
-                        if(!progressData[kampung][tanggalStr]) progressData[kampung][tanggalStr]={notes:"", items:{}};
-                        let key=sls+'||'+ppl;
-                        progressData[kampung][tanggalStr].items[key]={sls:sls,ppl:ppl,assignment:parts[4]||'0',bku:parts[5]||'0',keluarga:parts[6]||'0',bangunan:parts[7]||'0',usaha:parts[8]||'0',notes:parts[9]||''};
-                        importedCount++;
-                    }
-                }
-                else if(section === 'dokumentasi'){
-                    let firstComma = line.indexOf(','); 
-                    if(firstComma > 0){
-                        let kampung = line.substring(0, firstComma).trim();
-                        let rest = line.substring(firstComma + 1).trim();
-                        
-                        let src = rest.replace(/^"|"$/g, '');
-                        let caption = '';
-                        
-                        let lastComma = src.lastIndexOf(',');
-                        if(lastComma > 0 && src.includes('",')){
-                            let splitIdx = src.lastIndexOf('",');
-                            caption = src.substring(splitIdx + 2).trim();
-                            src = src.substring(0, splitIdx);
-                        }
-
-                        if(src && src.startsWith('http')){
-                            if(!photoData[kampung]) photoData[kampung] = [];
-                            photoData[kampung].push({src: src, caption: caption || ''});
-                        }
-                    }
-                }
-                else if(section === 'backup'){
-                    let parts = line.split(',').map(c => c.trim());
-                    if(parts.length >= 4 && parts[0] && !parts[0].includes('Nama_File')){
-                        wordBackupData.push({
-                            name: parts[0].replace(/^"|"$/g, ''),
-                            file: parts[1].replace(/^"|"$/g, ''),
-                            date: parts[2] || '',
-                            createdBy: parts[3] || ''
-                        });
-                    }
-                }
+            // Helper fungsi untuk mengambil data per sheet
+            function getSheetData(sheetName) {
+                let sheet = workbook.Sheets[sheetName];
+                if(!sheet) return [];
+                return XLSX.utils.sheet_to_json(sheet);
             }
-            
-            let petugasList = petugasRaw ? petugasRaw.split(';').map(p=>p.trim()).filter(Boolean) : [''];
-            if(petugasList.length===0) petugasList = [''];
-            S.petugas = petugasList;
-            if(tujuanVal) S.tujuan = tujuanVal;
-            if(tanggalAwalVal) S.tanggalAwal = tanggalAwalVal;
-            if(tanggalAkhirVal) S.tanggalAkhir = tanggalAkhirVal;
-            if(perihalVal) S.perihal = perihalVal;
-            if(nomorSuratVal) S.nomorSurat = nomorSuratVal;
-            if(kampungList.length>0) S.kampung = kampungList;
-            if(wilayahList.length>0) S.wilayah = wilayahList;
-            if(Object.keys(progressData).length>0) S.p = progressData;
-            if(Object.keys(photoData).length>0) S.photos = photoData;
-            if(wordBackupData.length>0) S.wordBackupUrl = wordBackupData;
-            
+
+            // Helper konversi tanggal Excel ke dd/mm/yyyy
+            function parseExcelDate(val) {
+                if(typeof val === 'number') { // Excel Serial Date
+                    let d = new Date((val - 25569) * 86400 * 1000);
+                    let day = String(d.getDate()).padStart(2,'0');
+                    let month = String(d.getMonth()+1).padStart(2,'0');
+                    let year = d.getFullYear();
+                    return `${day}/${month}/${year}`;
+                }
+                return String(val || '');
+            }
+
+            // --- 1. BACA DATA UTAMA ---
+            let utama = getSheetData('DATA UTAMA');
+            if(utama.length > 0) {
+                let row = utama[0];
+                let petugasRaw = row['Nama Petugas'] || '';
+                S.petugas = petugasRaw ? petugasRaw.split(';').map(p=>p.trim()).filter(Boolean) : [''];
+                if(S.petugas.length === 0) S.petugas = [''];
+                S.tujuan = row['Tujuan'] || '';
+                S.tanggalAwal = parseExcelDate(row['Tanggal Awal']);
+                S.tanggalAkhir = parseExcelDate(row['Tanggal Akhir']);
+                S.perihal = row['Perihal'] || "Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026";
+                S.nomorSurat = row['Nomor Surat Tugas'] || '';
+            }
+
+            // --- 2. BACA KAMPUNG TUJUAN ---
+            let kampungData = getSheetData('KAMPUNG TUJUAN');
+            S.kampung = kampungData.map(k => ({
+                kampung: k['Kampung'] || '',
+                distrik: k['Distrik'] || '',
+                mengetahui: k['Mengetahui'] || '',
+                jabatan: k['Jabatan'] || ''
+            }));
+
+            // --- 3. BACA WILAYAH TUGAS ---
+            let wilayahData = getSheetData('WILAYAH TUGAS');
+            S.wilayah = wilayahData.map(w => ({
+                kampung: w['Kampung'] || '',
+                sls: w['SLS'] || '',
+                ppl: w['Nama PPL'] || '',
+                start: parseExcelDate(w['Tanggal Awal']),
+                end: parseExcelDate(w['Tanggal Akhir']),
+                assignmentTotal: parseInt(w['AssignmentTotal']) || 0,
+                bkuTotal: parseInt(w['BKUTotal']) || 0,
+                keluargaTotal: parseInt(w['KeluargaTotal']) || 0,
+                bangunanTotal: parseInt(w['BangunanTotal']) || 0,
+                usahaTotal: parseInt(w['UsahaTotal']) || 0
+            }));
+
+            // --- 4. BACA DATA PROGRES ---
+            let progresData = getSheetData('DATA PROGRES');
+            S.p = {};
+            progresData.forEach(row => {
+                let kampung = row['Kampung'] || '';
+                let tanggal = parseExcelDate(row['Tanggal']);
+                let sls = row['SLS'] || '';
+                let ppl = row['PPL'] || '';
+                if(!kampung || !tanggal) return;
+                
+                if(!S.p[kampung]) S.p[kampung] = {};
+                if(!S.p[kampung][tanggal]) S.p[kampung][tanggal] = {notes:"", items:{}};
+                let key = sls + '||' + ppl;
+                S.p[kampung][tanggal].items[key] = {
+                    sls: sls,
+                    ppl: ppl,
+                    assignment: String(row['Assignment'] || '0'),
+                    bku: String(row['BKU'] || '0'),
+                    keluarga: String(row['Keluarga'] || '0'),
+                    bangunan: String(row['Bangunan Lainnya'] || '0'),
+                    usaha: String(row['Usaha'] || '0'),
+                    notes: row['Catatan SLS'] || ''
+                };
+            });
+
+            // --- 5. BACA DOKUMENTASI ---
+            let dokumenData = getSheetData('DOKUMENTASI');
+            S.photos = {};
+            dokumenData.forEach(row => {
+                let kampung = row['Kampung'] || '';
+                let src = row['Cloudinary_URL_Gambar'] || '';
+                let caption = row['Caption'] || '';
+                if(kampung && src) {
+                    if(!S.photos[kampung]) S.photos[kampung] = [];
+                    S.photos[kampung].push({src: src, caption: caption});
+                }
+            });
+
+            // --- 6. BACA BACKUP WORD ---
+            let backupWordData = getSheetData('BACKUP WORD');
+            S.wordBackupUrl = backupWordData.map(w => ({
+                name: w['Nama_File'] || '',
+                file: w['Cloudinary_Word_URL'] || '',
+                date: w['Tanggal_Dibuat'] || '',
+                createdBy: w['Dibuat_oleh'] || ''
+            }));
+
+            // --- RENDER ULANG UI ---
             renderPetugas();
             document.getElementById('tujuan').value = S.tujuan || "";
-            
             if(S.tanggalAwal){
-                let parts = S.tanggalAwal.split('-');
+                let parts = S.tanggalAwal.split('/');
                 if(parts.length === 3){
-                    document.getElementById('tanggalAwal').value = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                    document.getElementById('tanggalAwal').value = `${parts[0]}/${parts[1]}/${parts[2]}`;
                 }
             }
             if(S.tanggalAkhir){
-                let parts = S.tanggalAkhir.split('-');
+                let parts = S.tanggalAkhir.split('/');
                 if(parts.length === 3){
-                    document.getElementById('tanggalAkhir').value = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                    document.getElementById('tanggalAkhir').value = `${parts[0]}/${parts[1]}/${parts[2]}`;
                 }
             }
-            
             document.getElementById('perihal').value = S.perihal || "Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026";
             document.getElementById('nomorSurat').value = S.nomorSurat || "";
             renderKampung();
             renderWilayah();
             if(Object.keys(S.p).length>0){$("progress").classList.remove("hidden");renderProgress();}
             renderDokumentasi();
-            
-            let msg = `✅ Berhasil restore data.`;
-            msg += `<br>👤 Petugas: ${S.petugas.length} orang`;
-            msg += `<br>🏠 Kampung: ${S.kampung.length}`;
-            msg += `<br>📋 Wilayah Tugas: ${S.wilayah.length}`;
-            msg += `<br>📊 Data Progres: ${importedCount} baris`;
-            let totalPhotos = 0;
-            Object.values(photoData).forEach(arr => totalPhotos += arr.length);
-            msg += `<br>📷 Dokumentasi: ${totalPhotos} gambar`;
-            msg += `<br>📄 Backup Word: ${wordBackupData.length} file`;
-            $("status").innerHTML = `<div class="status">${msg}</div>`;
+
+            let totalPhotos = Object.values(S.photos).reduce((acc, arr) => acc + arr.length, 0);
+            $("status").innerHTML = `<div class="status">✅ Berhasil restore data dari Excel!<br>
+                👤 Petugas: ${S.petugas.length} orang<br>
+                🏠 Kampung: ${S.kampung.length}<br>
+                📋 Wilayah: ${S.wilayah.length}<br>
+                📸 Dokumentasi: ${totalPhotos} gambar
+            </div>`;
             save();
-        } catch(err){alert('Error: '+err.message);console.error(err);}
+        } catch(err){alert('Error saat membaca Excel: '+err.message);console.error(err);}
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
     event.target.value = '';
 }
 
