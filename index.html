@@ -834,7 +834,8 @@ function generateOfflineWordAndBackup(resizedImages){
                 pplNames.push(w.ppl.trim());
             }
         });
-        let namaPpl = pplNames.length > 0 ? pplNames[0] : "TanpaNama";
+        let ppl = S.petugas.filter(p=>p.trim());
+        let namaPpl = ppl.length > 0 ? ppl[0] : "TanpaNama";
         let tanggalSekarang = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }).replace(/\s/g, "_");
         let fileName = `Laporan_Perjalanan_Dinas_Tim_${namaPpl}_${tanggalSekarang}.doc`;
 
