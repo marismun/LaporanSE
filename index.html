@@ -370,7 +370,7 @@ function parseDateFromCSV(dateStr) {
 
 // ===================== CLOUDINARY (DIPERBAIKI) =====================
 const CLOUDINARY_CLOUD_NAME = "uxr4cmqd";
-const CLOUDINARY_UPLOAD_PRESET = "Laporan";
+const CLOUDINARY_UPLOAD_PRESET = "ml_default"; // ganti dari "Laporan" menjadi "ml_default"
 
 function uploadFileToCloudinary(file, isImage, onSuccess, onError) {
     let formData = new FormData();
