@@ -198,7 +198,6 @@ footer{margin-top:30px;text-align:center;color:var(--text-gray);font-size:12px;b
 <div class="global-toolbar">
     <div class="toolbar-left">
         <span>📊 BPS</span>
-        <!-- Tombol Backup kini akan memilih format otomatis (Excel jika library ada, jika tidak CSV) -->
         <button class="btn btn-success" onclick="exportExcel()">📥 Backup Data</button>
         <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">📤 Restore</button>
         <input type="file" id="fileInput" accept=".xlsx,.csv" style="display:none" onchange="importExcel(event)">
@@ -289,7 +288,7 @@ footer{margin-top:30px;text-align:center;color:var(--text-gray);font-size:12px;b
     <footer>© BPS Raja Ampat — Data diproses aman di peramban Anda.</footer>
 </div>
 
-<!-- Library SheetJS diletakkan di paling bawah agar browser mobile lebih mudah memuatnya -->
+<!-- Library SheetJS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script>
@@ -1316,25 +1315,24 @@ function fallbackExportCSV() {
 // ===== AKHIR BAGIAN YANG DIPERBAIKI =========================
 // ============================================================
 
-// ===== IMPORT EXCEL (Mendukung Excel dan CSV lama) =====
+// ===== IMPORT EXCEL / CSV (DIPERBAIKI) =====
 function importExcel(event){
     let file = event.target.files[0];
-    if (!file) { alert('Pilih file Backup (.xlsx atau .csv) terlebih dahulu.'); return; }
-    let reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            // Deteksi apakah file CSV
-            let isCSV = file.name.toLowerCase().endsWith('.csv');
-            if (!isCSV) {
-                // Coba deteksi dari konten
-                let textSample = e.target.result.slice(0, 200);
-                if (textSample.includes('=== DATA UTAMA ===')) {
-                    isCSV = true;
-                }
-            }
-            if (isCSV) {
+    if (!file) {
+        alert('Pilih file Backup (.xlsx atau .csv) terlebih dahulu.');
+        return;
+    }
+
+    let isCSV = file.name.toLowerCase().endsWith('.csv');
+
+    if (isCSV) {
+        // Baca sebagai teks
+        let reader = new FileReader();
+        reader.onload = function(e) {
+            try {
                 let text = e.target.result;
                 importLegacyCSV(text);
+                // Refresh UI
                 renderPetugas();
                 document.getElementById('tujuan').value = S.tujuan || "";
                 if (S.tanggalAwal) {
@@ -1353,22 +1351,43 @@ function importExcel(event){
                 document.getElementById('nomorSurat').value = S.nomorSurat || "";
                 renderKampung();
                 renderWilayah();
-                if (Object.keys(S.p).length > 0) { $("progress").classList.remove("hidden"); renderProgress(); }
+                if (Object.keys(S.p).length > 0) {
+                    $("progress").classList.remove("hidden");
+                    renderProgress();
+                }
                 renderDokumentasi();
                 let totalPhotos = Object.values(S.photos).reduce((acc, arr) => acc + arr.length, 0);
-                $("status").innerHTML = `<div class="status">✅ Berhasil restore data dari CSV lama!<br>👤 Petugas: ${S.petugas.length} orang<br>🏠 Kampung: ${S.kampung.length}<br>📋 Wilayah: ${S.wilayah.length}<br>📸 Dokumentasi: ${totalPhotos} gambar</div>`;
+                $("status").innerHTML = `<div class="status">✅ Berhasil restore data dari CSV!<br>👤 Petugas: ${S.petugas.length} orang<br>🏠 Kampung: ${S.kampung.length}<br>📋 Wilayah: ${S.wilayah.length}<br>📸 Dokumentasi: ${totalPhotos} gambar</div>`;
                 save();
+            } catch (err) {
+                alert('Error saat membaca CSV: ' + err.message);
+                console.error(err);
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+        return;
+    }
+
+    // --- Bukan CSV, baca sebagai Excel (ArrayBuffer) ---
+    let reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            // Cek apakah library XLSX tersedia
+            if (typeof XLSX === 'undefined' || typeof XLSX.utils === 'undefined') {
+                alert('Library Excel tidak tersedia. Pastikan koneksi internet aktif, atau gunakan file CSV.');
                 return;
             }
 
-            // Jika bukan CSV, proses sebagai Excel
             let data = new Uint8Array(e.target.result);
             let workbook = XLSX.read(data, { type: 'array' });
+
             function getSheetData(sheetName) {
                 let sheet = workbook.Sheets[sheetName];
                 if (!sheet) return [];
                 return XLSX.utils.sheet_to_json(sheet);
             }
+
             function parseExcelDate(val) {
                 if (typeof val === 'number') {
                     let d = new Date((val - 25569) * 86400 * 1000);
@@ -1379,6 +1398,8 @@ function importExcel(event){
                 }
                 return String(val || '');
             }
+
+            // DATA UTAMA
             let utama = getSheetData('DATA UTAMA');
             if (utama.length > 0) {
                 let row = utama[0];
@@ -1391,10 +1412,32 @@ function importExcel(event){
                 S.perihal = row['Perihal'] || "Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026";
                 S.nomorSurat = row['Nomor Surat Tugas'] || '';
             }
+
+            // KAMPUNG
             let kampungData = getSheetData('KAMPUNG TUJUAN');
-            S.kampung = kampungData.map(k => ({ kampung: k['Kampung'] || '', distrik: k['Distrik'] || '', mengetahui: k['Mengetahui'] || '', jabatan: k['Jabatan'] || '' }));
+            S.kampung = kampungData.map(k => ({
+                kampung: k['Kampung'] || '',
+                distrik: k['Distrik'] || '',
+                mengetahui: k['Mengetahui'] || '',
+                jabatan: k['Jabatan'] || ''
+            }));
+
+            // WILAYAH
             let wilayahData = getSheetData('WILAYAH TUGAS');
-            S.wilayah = wilayahData.map(w => ({ kampung: w['Kampung'] || '', sls: w['SLS'] || '', ppl: w['Nama PPL'] || '', start: parseExcelDate(w['Tanggal Awal']), end: parseExcelDate(w['Tanggal Akhir']), assignmentTotal: parseInt(w['AssignmentTotal']) || 0, bkuTotal: parseInt(w['BKUTotal']) || 0, keluargaTotal: parseInt(w['KeluargaTotal']) || 0, bangunanTotal: parseInt(w['BangunanTotal']) || 0, usahaTotal: parseInt(w['UsahaTotal']) || 0 }));
+            S.wilayah = wilayahData.map(w => ({
+                kampung: w['Kampung'] || '',
+                sls: w['SLS'] || '',
+                ppl: w['Nama PPL'] || '',
+                start: parseExcelDate(w['Tanggal Awal']),
+                end: parseExcelDate(w['Tanggal Akhir']),
+                assignmentTotal: parseInt(w['AssignmentTotal']) || 0,
+                bkuTotal: parseInt(w['BKUTotal']) || 0,
+                keluargaTotal: parseInt(w['KeluargaTotal']) || 0,
+                bangunanTotal: parseInt(w['BangunanTotal']) || 0,
+                usahaTotal: parseInt(w['UsahaTotal']) || 0
+            }));
+
+            // PROGRES
             let progresData = getSheetData('DATA PROGRES');
             S.p = {};
             progresData.forEach(row => {
@@ -1406,8 +1449,19 @@ function importExcel(event){
                 if (!S.p[kampung]) S.p[kampung] = {};
                 if (!S.p[kampung][tanggal]) S.p[kampung][tanggal] = { notes: "", items: {} };
                 let key = sls + '||' + ppl;
-                S.p[kampung][tanggal].items[key] = { sls: sls, ppl: ppl, assignment: String(row['Assignment'] || '0'), bku: String(row['BKU'] || '0'), keluarga: String(row['Keluarga'] || '0'), bangunan: String(row['Bangunan Lainnya'] || '0'), usaha: String(row['Usaha'] || '0'), notes: row['Catatan SLS'] || '' };
+                S.p[kampung][tanggal].items[key] = {
+                    sls: sls,
+                    ppl: ppl,
+                    assignment: String(row['Assignment'] || '0'),
+                    bku: String(row['BKU'] || '0'),
+                    keluarga: String(row['Keluarga'] || '0'),
+                    bangunan: String(row['Bangunan Lainnya'] || '0'),
+                    usaha: String(row['Usaha'] || '0'),
+                    notes: row['Catatan SLS'] || ''
+                };
             });
+
+            // DOKUMENTASI
             let dokumenData = getSheetData('DOKUMENTASI');
             S.photos = {};
             dokumenData.forEach(row => {
@@ -1419,8 +1473,17 @@ function importExcel(event){
                     S.photos[kampung].push({ src: src, caption: caption });
                 }
             });
+
+            // BACKUP WORD
             let backupWordData = getSheetData('BACKUP WORD');
-            S.wordBackupUrl = backupWordData.map(w => ({ name: w['Nama_File'] || '', file: w['Cloudinary_Word_URL'] || '', date: w['Tanggal_Dibuat'] || '', createdBy: w['Dibuat_oleh'] || '' }));
+            S.wordBackupUrl = backupWordData.map(w => ({
+                name: w['Nama_File'] || '',
+                file: w['Cloudinary_Word_URL'] || '',
+                date: w['Tanggal_Dibuat'] || '',
+                createdBy: w['Dibuat_oleh'] || ''
+            }));
+
+            // Refresh UI
             renderPetugas();
             document.getElementById('tujuan').value = S.tujuan || "";
             if (S.tanggalAwal) {
@@ -1439,21 +1502,21 @@ function importExcel(event){
             document.getElementById('nomorSurat').value = S.nomorSurat || "";
             renderKampung();
             renderWilayah();
-            if (Object.keys(S.p).length > 0) { $("progress").classList.remove("hidden"); renderProgress(); }
+            if (Object.keys(S.p).length > 0) {
+                $("progress").classList.remove("hidden");
+                renderProgress();
+            }
             renderDokumentasi();
             let totalPhotos = Object.values(S.photos).reduce((acc, arr) => acc + arr.length, 0);
             $("status").innerHTML = `<div class="status">✅ Berhasil restore data dari Excel!<br>👤 Petugas: ${S.petugas.length} orang<br>🏠 Kampung: ${S.kampung.length}<br>📋 Wilayah: ${S.wilayah.length}<br>📸 Dokumentasi: ${totalPhotos} gambar</div>`;
             save();
+
         } catch (err) {
-            alert('Error saat membaca file: ' + err.message);
+            alert('Error saat membaca Excel: ' + err.message);
             console.error(err);
         }
     };
-    if (file.name.toLowerCase().endsWith('.csv')) {
-        reader.readAsText(file);
-    } else {
-        reader.readAsArrayBuffer(file);
-    }
+    reader.readAsArrayBuffer(file);
     event.target.value = '';
 }
 
@@ -1467,4 +1530,4 @@ renderWilayah();
 renderDokumentasi();
 </script>
 </body>
-</html>
+    </html>
