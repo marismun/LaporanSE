@@ -1073,106 +1073,248 @@ function importLegacyCSV(text) {
     if (wordBackupData.length > 0) S.wordBackupUrl = wordBackupData;
 }
 
-// ===== EXPORT EXCEL / CSV (Dengan Logika Fallback) =====
-function exportExcel(){
+// ============================================================
+// ===== BAGIAN YANG DIPERBAIKI: EXPORT EXCEL + FALLBACK =====
+// ============================================================
+
+// ===== FUNGSI DOWNLOAD YANG LEBIH STABIL UNTUK MOBILE =====
+function downloadFile(blob, fileName) {
+    // Coba gunakan msSaveBlob (untuk IE/Edge lama)
+    if (navigator.msSaveBlob) {
+        navigator.msSaveBlob(blob, fileName);
+        return true;
+    }
+    // Fallback standar
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    // Hapus setelah beberapa saat agar tidak mengganggu
+    setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+    }, 5000);
+    return true;
+}
+
+function generateFileName(ext) {
+    let ppl = S.petugas.filter(p => p.trim());
+    let nama = ppl.length ? ppl[0] : 'TanpaNama';
+    let now = new Date();
+    let tgl = now.toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' }).replace(/\s/g, '_');
+    let jam = now.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', hour12:false }).replace(/:/g, '.');
+    return `Laporan_${nama}_${tgl}_${jam}.${ext}`;
+}
+
+// ===== EXPORT EXCEL (dengan fallback CSV otomatis) =====
+function exportExcel() {
+    // Validasi data dasar
+    if (S.wilayah.length === 0) {
+        alert('⚠️ Data wilayah tugas kosong. Silakan isi data dan klik "Generate Form" terlebih dahulu.');
+        return;
+    }
+    // Coba library XLSX
+    let useXLSX = false;
     try {
-        // Cek apakah library XLSX berhasil dimuat
-        if (typeof XLSX === 'undefined' || typeof XLSX.utils === 'undefined') {
-            // FALLBACK: Library gagal load, gunakan format CSV lama
-            console.warn("Library XLSX gagal dimuat. Beralih ke format CSV untuk backup.");
-            fallbackExportCSV();
-            return;
+        useXLSX = (typeof XLSX !== 'undefined' && typeof XLSX.utils !== 'undefined');
+    } catch(e) { useXLSX = false; }
+
+    if (useXLSX) {
+        try {
+            // --- Membuat workbook Excel ---
+            let wb = XLSX.utils.book_new();
+
+            // Sheet DATA UTAMA
+            let utamaData = [
+                ["Nama Petugas","Tujuan","Tanggal Awal","Tanggal Akhir","Perihal","Nomor Surat Tugas"]
+            ];
+            let petugasStr = S.petugas.filter(p=>p.trim()).join('; ');
+            utamaData.push([
+                petugasStr,
+                S.tujuan || '',
+                S.tanggalAwal || '',
+                S.tanggalAkhir || '',
+                S.perihal || '',
+                S.nomorSurat || ''
+            ]);
+            let wsUtama = XLSX.utils.aoa_to_sheet(utamaData);
+            XLSX.utils.book_append_sheet(wb, wsUtama, "DATA UTAMA");
+
+            // Sheet KAMPUNG
+            let kampungData = [["Kampung","Distrik","Mengetahui","Jabatan"]];
+            S.kampung.forEach(k => {
+                kampungData.push([k.kampung||'', k.distrik||'', k.mengetahui||'', k.jabatan||'']);
+            });
+            let wsKampung = XLSX.utils.aoa_to_sheet(kampungData);
+            XLSX.utils.book_append_sheet(wb, wsKampung, "KAMPUNG");
+
+            // Sheet WILAYAH
+            let wilayahData = [["Kampung","SLS","PPL","Tanggal Awal","Tanggal Akhir","AssignmentTotal","BKUTotal","KeluargaTotal","BangunanTotal","UsahaTotal"]];
+            S.wilayah.forEach(w => {
+                wilayahData.push([
+                    w.kampung||'', w.sls||'', w.ppl||'',
+                    w.start||'', w.end||'',
+                    w.assignmentTotal||0, w.bkuTotal||0,
+                    w.keluargaTotal||0, w.bangunanTotal||0, w.usahaTotal||0
+                ]);
+            });
+            let wsWilayah = XLSX.utils.aoa_to_sheet(wilayahData);
+            XLSX.utils.book_append_sheet(wb, wsWilayah, "WILAYAH");
+
+            // Sheet PROGRES (jika ada)
+            let progresData = [["Kampung","Tanggal","SLS","PPL","Assignment","BKU","Keluarga","Bangunan Lainnya","Usaha","Catatan"]];
+            let vs = group(); // sudah pasti tidak error karena S.wilayah ada
+            vs.forEach(v => {
+                let ds = Object.keys(S.p[v.name] || {}).sort();
+                ds.forEach(d => {
+                    let items = S.p[v.name][d].items || {};
+                    Object.values(items).forEach(x => {
+                        progresData.push([
+                            v.name, d,
+                            x.sls||'', x.ppl||'',
+                            x.assignment||'0', x.bku||'0',
+                            x.keluarga||'0', x.bangunan||'0',
+                            x.usaha||'0', x.notes||''
+                        ]);
+                    });
+                });
+            });
+            if (progresData.length > 1) { // ada data
+                let wsProgres = XLSX.utils.aoa_to_sheet(progresData);
+                XLSX.utils.book_append_sheet(wb, wsProgres, "PROGRES");
+            }
+
+            // Sheet DOKUMENTASI
+            let dokumenData = [["Kampung","Cloudinary_URL","Caption"]];
+            vs.forEach(v => {
+                let photos = S.photos[v.name] || [];
+                photos.forEach(p => {
+                    if (p.src) dokumenData.push([v.name, p.src, p.caption||'']);
+                });
+            });
+            let perahuPhotos = S.photos["Perahu"] || [];
+            perahuPhotos.forEach(p => {
+                if (p.src) dokumenData.push(["Perahu", p.src, p.caption||'']);
+            });
+            let wsDokumen = XLSX.utils.aoa_to_sheet(dokumenData);
+            XLSX.utils.book_append_sheet(wb, wsDokumen, "DOKUMENTASI");
+
+            // Sheet BACKUP WORD
+            let backupData = [["Nama_File","URL","Tanggal","Dibuat_Oleh"]];
+            if (S.wordBackupUrl && S.wordBackupUrl.length > 0) {
+                S.wordBackupUrl.forEach(w => {
+                    backupData.push([w.name||'', w.file||'', w.date||'', w.createdBy||'']);
+                });
+            } else {
+                backupData.push(["Belum ada backup", "", "", ""]);
+            }
+            let wsBackup = XLSX.utils.aoa_to_sheet(backupData);
+            XLSX.utils.book_append_sheet(wb, wsBackup, "BACKUP");
+
+            // Tulis file
+            let wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            let blob = new Blob([wbout], { type: 'application/octet-stream' });
+            let namaFile = generateFileName('xlsx');
+            downloadFile(blob, namaFile);
+            $("status").innerHTML = '<div class="status" style="background:#d4edda; border-color:#28a745;">✅ Backup Excel berhasil diunduh!</div>';
+            return; // sukses
+        } catch (e) {
+            console.warn('Gagal membuat Excel, beralih ke CSV:', e);
+            // lanjut ke fallback
+        }
+    }
+
+    // === FALLBACK: selalu gunakan CSV ===
+    fallbackExportCSV();
+}
+
+// ===== FALLBACK CSV (PASTI JALAN) =====
+function fallbackExportCSV() {
+    try {
+        let rows = [];
+        // Header utama
+        rows.push('=== DATA UTAMA ===');
+        rows.push('Nama Petugas,' + S.petugas.filter(p=>p.trim()).join('; '));
+        rows.push('Tujuan,' + S.tujuan);
+        rows.push('Tanggal Awal,' + S.tanggalAwal);
+        rows.push('Tanggal Akhir,' + S.tanggalAkhir);
+        rows.push('Perihal,' + S.perihal);
+        rows.push('Nomor Surat Tugas,' + S.nomorSurat);
+        rows.push('');
+
+        rows.push('=== KAMPUNG TUJUAN ===');
+        rows.push('Kampung,Distrik,Mengetahui,Jabatan');
+        S.kampung.forEach(k => {
+            rows.push(`${k.kampung||''},${k.distrik||''},${k.mengetahui||''},${k.jabatan||''}`);
+        });
+        rows.push('');
+
+        rows.push('=== WILAYAH TUGAS ===');
+        rows.push('Kampung,SLS,PPL,Tanggal Awal,Tanggal Akhir,AssignmentTotal,BKUTotal,KeluargaTotal,BangunanTotal,UsahaTotal');
+        S.wilayah.forEach(w => {
+            rows.push(`${w.kampung||''},${w.sls||''},${w.ppl||''},${w.start||''},${w.end||''},${w.assignmentTotal||0},${w.bkuTotal||0},${w.keluargaTotal||0},${w.bangunanTotal||0},${w.usahaTotal||0}`);
+        });
+        rows.push('');
+
+        rows.push('=== DATA PROGRES ===');
+        rows.push('Kampung,Tanggal,SLS,PPL,Assignment,BKU,Keluarga,Bangunan Lainnya,Usaha,Catatan');
+        let vs = group();
+        vs.forEach(v => {
+            let ds = Object.keys(S.p[v.name] || {}).sort();
+            ds.forEach(d => {
+                let items = S.p[v.name][d].items || {};
+                Object.values(items).forEach(x => {
+                    rows.push([
+                        v.name, d,
+                        x.sls||'', x.ppl||'',
+                        x.assignment||'0', x.bku||'0',
+                        x.keluarga||'0', x.bangunan||'0',
+                        x.usaha||'0', x.notes||''
+                    ].join(','));
+                });
+            });
+        });
+        rows.push('');
+
+        rows.push('=== DOKUMENTASI ===');
+        rows.push('Kampung,Cloudinary_URL_Gambar,Caption');
+        vs.forEach(v => {
+            let photos = S.photos[v.name] || [];
+            photos.forEach(p => {
+                if (p.src) rows.push(`${v.name},"${p.src}",${p.caption||''}`);
+            });
+        });
+        let perahuPhotos = S.photos["Perahu"] || [];
+        perahuPhotos.forEach(p => {
+            if (p.src) rows.push(`Perahu,"${p.src}",${p.caption||''}`);
+        });
+        rows.push('');
+
+        rows.push('=== BACKUP WORD ===');
+        rows.push('Nama_File,Cloudinary_Word_URL,Tanggal_Dibuat,Dibuat_oleh');
+        if (S.wordBackupUrl && S.wordBackupUrl.length > 0) {
+            S.wordBackupUrl.forEach(w => {
+                rows.push(`"${w.name||''}","${w.file||''}",${w.date||''},${w.createdBy||''}`);
+            });
+        } else {
+            rows.push('"Belum ada backup","","",""');
         }
 
-        // Normal Path: Export ke Excel
-        let wb = XLSX.utils.book_new();
-        let utamaData = [["Nama Petugas","Tujuan","Tanggal Awal","Tanggal Akhir","Perihal","Nomor Surat Tugas"]]; utamaData.push([S.petugas.filter(p=>p.trim()).join('; '),S.tujuan||'',S.tanggalAwal||'',S.tanggalAkhir||'',S.perihal||'',S.nomorSurat||'']);
-        let wsUtama = XLSX.utils.aoa_to_sheet(utamaData); XLSX.utils.book_append_sheet(wb, wsUtama, "DATA UTAMA");
-        let kampungData = [["Kampung","Distrik","Mengetahui","Jabatan"]]; S.kampung.forEach(k=>{ kampungData.push([k.kampung||'',k.distrik||'',k.mengetahui||'',k.jabatan||'']); });
-        let wsKampung = XLSX.utils.aoa_to_sheet(kampungData); XLSX.utils.book_append_sheet(wb, wsKampung, "KAMPUNG TUJUAN");
-        let wilayahData = [["Kampung","SLS","Nama PPL","Tanggal Awal","Tanggal Akhir","AssignmentTotal","BKUTotal","KeluargaTotal","BangunanTotal","UsahaTotal"]]; S.wilayah.forEach(w=>{ wilayahData.push([w.kampung||'',w.sls||'',w.ppl||'',w.start||'',w.end||'',w.assignmentTotal||0,w.bkuTotal||0,w.keluargaTotal||0,w.bangunanTotal||0,w.usahaTotal||0]); });
-        let wsWilayah = XLSX.utils.aoa_to_sheet(wilayahData); XLSX.utils.book_append_sheet(wb, wsWilayah, "WILAYAH TUGAS");
-        let progresData = [["Kampung","Tanggal","SLS","PPL","Assignment","BKU","Keluarga","Bangunan Lainnya","Usaha","Catatan SLS"]]; let vs = group(); vs.forEach(v=>{ let ds=Object.keys(S.p[v.name]||{}).sort(); ds.forEach(d=>{ Object.values(S.p[v.name][d].items).forEach(x=>{ progresData.push([v.name,d,x.sls,x.ppl,x.assignment||'0',x.bku||'0',x.keluarga||'0',x.bangunan||'0',x.usaha||'0',x.notes||'']); }); }); });
-        let wsProgres = XLSX.utils.aoa_to_sheet(progresData); XLSX.utils.book_append_sheet(wb, wsProgres, "DATA PROGRES");
-        let dokumenData = [["Kampung","Cloudinary_URL_Gambar","Caption"]]; vs.forEach(v=>{ let photos=S.photos[v.name]||[]; photos.forEach(p=>{ if(p.src) dokumenData.push([v.name,p.src,p.caption||'']); }); }); let perahuPhotos=S.photos["Perahu"]||[]; perahuPhotos.forEach(p=>{ if(p.src) dokumenData.push(["Perahu",p.src,p.caption||'']); });
-        let wsDokumen = XLSX.utils.aoa_to_sheet(dokumenData); XLSX.utils.book_append_sheet(wb, wsDokumen, "DOKUMENTASI");
-        let backupWordData = [["Nama_File","Cloudinary_Word_URL","Tanggal_Dibuat","Dibuat_oleh"]]; if(S.wordBackupUrl&&S.wordBackupUrl.length>0){ S.wordBackupUrl.forEach(w=>{ backupWordData.push([w.name||'',w.file||'',w.date||'',w.createdBy||'']); }); } else { backupWordData.push(["Belum ada backup","","",""]); }
-        let wsBackup = XLSX.utils.aoa_to_sheet(backupWordData); XLSX.utils.book_append_sheet(wb, wsBackup, "BACKUP WORD");
-        let wbout = XLSX.write(wb,{bookType:'xlsx',type:'array'}); let blob=new Blob([wbout],{type:'application/octet-stream'}); let link=document.createElement('a'); link.href=URL.createObjectURL(blob);
-        let pplNames=S.petugas.filter(p=>p.trim()); let ppl1=pplNames.length>0?pplNames[0]:"TanpaNama"; let now=new Date(); let tgl=now.toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"}).replace(/\s/g,"_"); let jam=now.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit",hour12:false}).replace(/:/g,"."); link.download=`Laporan SE Tim ${ppl1} - ${tgl} - ${jam} WIT.xlsx`;
-        link.click(); URL.revokeObjectURL(link.href); $("status").innerHTML='<div class="status">✅ Backup data lengkap berhasil diexport ke Excel (.xlsx).</div>';
-    } catch (err) {
-        console.error("Error saat Backup Excel:", err);
-        // Jika gagal di tengah proses, alihkan ke fallback CSV
-        fallbackExportCSV();
+        let csvContent = rows.join('\n');
+        let blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        let namaFile = generateFileName('csv');
+        downloadFile(blob, namaFile);
+        $("status").innerHTML = '<div class="status" style="background:#ffeaa7;">⚠️ Backup dalam format CSV (karena Excel tidak tersedia). Buka dengan Excel untuk konversi.</div>';
+    } catch (e) {
+        alert('Gagal membuat backup CSV: ' + e.message);
+        console.error(e);
     }
 }
 
-// ===== FALLBACK EXPORT CSV (Jika Library Excel Gagal) =====
-function fallbackExportCSV(){
-    let rows = [];
-    rows.push('=== DATA UTAMA ===');
-    rows.push('Nama Petugas,' + S.petugas.filter(p => p.trim()).join('; '));
-    rows.push('Tujuan,' + S.tujuan);
-    rows.push('Tanggal Awal,' + S.tanggalAwal);
-    rows.push('Tanggal Akhir,' + S.tanggalAkhir);
-    rows.push('Perihal,' + S.perihal);
-    rows.push('Nomor Surat Tugas,' + S.nomorSurat);
-    rows.push('');
-    
-    rows.push('=== KAMPUNG TUJUAN ===');
-    rows.push('Kampung,Distrik,Mengetahui,Jabatan');
-    S.kampung.forEach(k => { rows.push(`${k.kampung},${k.distrik},${k.mengetahui},${k.jabatan}`); });
-    rows.push('');
-    
-    rows.push('=== WILAYAH TUGAS ===');
-    rows.push('Kampung,SLS,Nama PPL,Tanggal Awal,Tanggal Akhir,AssignmentTotal,BKUTotal,KeluargaTotal,BangunanTotal,UsahaTotal');
-    S.wilayah.forEach(w => { rows.push(`${w.kampung},${w.sls},${w.ppl},${w.start},${w.end},${w.assignmentTotal||0},${w.bkuTotal||0},${w.keluargaTotal||0},${w.bangunanTotal||0},${w.usahaTotal||0}`); });
-    rows.push('');
-    
-    rows.push('=== DATA PROGRES ===');
-    rows.push('Kampung,Tanggal,SLS,PPL,Assignment,BKU,Keluarga,Bangunan Lainnya,Usaha,Catatan SLS');
-    let vs = group();
-    vs.forEach(v => {
-        let ds = Object.keys(S.p[v.name]||{}).sort();
-        ds.forEach(d => {
-            Object.values(S.p[v.name][d].items).forEach(x => {
-                rows.push([v.name,d,x.sls,x.ppl,x.assignment||'0',x.bku||'0',x.keluarga||'0',x.bangunan||'0',x.usaha||'0',x.notes||''].join(','));
-            });
-        });
-    });
-    rows.push('');
-    
-    rows.push('=== DOKUMENTASI ===');
-    rows.push('Kampung,Cloudinary_URL_Gambar,Caption');
-    vs.forEach(v => {
-        let photos = S.photos[v.name] || [];
-        photos.forEach(p => {
-            if(p.src){ rows.push(`${v.name},"${p.src}",${p.caption||''}`); }
-        });
-    });
-    let perahuPhotos = S.photos["Perahu"] || [];
-    perahuPhotos.forEach(p => { if(p.src){ rows.push(`Perahu,"${p.src}",${p.caption||''}`); } });
-    rows.push('');
-    rows.push('=== BACKUP WORD ===');
-    rows.push('Nama_File,Cloudinary_Word_URL,Tanggal_Dibuat,Dibuat_oleh');
-    if(S.wordBackupUrl && S.wordBackupUrl.length > 0) {
-        S.wordBackupUrl.forEach(w => { rows.push(`"${w.name}","${w.file}",${w.date||''},${w.createdBy||''}`); });
-    } else { rows.push('"Belum ada backup","","",""'); }
-    
-    let csvContent = rows.join('\n');
-    let blob = new Blob(['\ufeff' + csvContent], {type: 'text/csv;charset=utf-8;'});
-    let link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    let pplNames = S.petugas.filter(p => p.trim());
-    let ppl1 = pplNames.length > 0 ? pplNames[0] : "TanpaNama";
-    let now = new Date();
-    let tgl = now.toLocaleDateString("id-ID", {day:"numeric", month:"short", year:"numeric"}).replace(/\s/g, "_");
-    let jam = now.toLocaleTimeString("id-ID", {hour:"2-digit", minute:"2-digit", hour12:false}).replace(/:/g, ".");
-    link.download = `Laporan SE Tim ${ppl1} - ${tgl} - ${jam} WIT.csv`;
-    link.click(); URL.revokeObjectURL(link.href);
-    $("status").innerHTML = '<div class="status" style="background:#ffeaa7;">⚠️ Excel tidak tersedia. Backup berhasil dalam format CSV. Anda dapat mengubahnya menjadi Excel secara manual.</div>';
-}
+// ============================================================
+// ===== AKHIR BAGIAN YANG DIPERBAIKI =========================
+// ============================================================
 
 // ===== IMPORT EXCEL (Mendukung Excel dan CSV lama) =====
 function importExcel(event){
