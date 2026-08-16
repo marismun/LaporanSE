@@ -201,7 +201,7 @@ footer{margin-top:30px;text-align:center;color:var(--text-gray);font-size:12px;b
     <div class="toolbar-left">
         <span>📊 BPS</span>
         <button class="btn btn-success" onclick="exportExcel()">📥 Backup (.xlsx)</button>
-        <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">📤 Restore (.xlsx)</button>
+        <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">📤 Restore</button>
         <input type="file" id="fileInput" accept=".xlsx,.csv" style="display:none" onchange="importExcel(event)">
         <button class="btn btn-outline" onclick="save()">💾 Simpan</button>
         <button class="btn btn-outline" onclick="load()">📂 Muat</button>
@@ -292,39 +292,39 @@ footer{margin-top:30px;text-align:center;color:var(--text-gray);font-size:12px;b
 
 <script>
 // STATE GLOBAL
-const S={
-    petugas:[],
-    tujuan:"",
-    tanggalAwal:"",
-    tanggalAkhir:"",
-    perihal:"Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026",
-    nomorSurat:"",
-    kampung:[],
-    wilayah:[],
-    p:{},
-    photos:{},
-    wordBackupUrl:[],
-    v:0,
-    docV:0,
-    docMode:'kampung'
+const S = {
+    petugas: [],
+    tujuan: "",
+    tanggalAwal: "",
+    tanggalAkhir: "",
+    perihal: "Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026",
+    nomorSurat: "",
+    kampung: [],
+    wilayah: [],
+    p: {},
+    photos: {},
+    wordBackupUrl: [],
+    v: 0,
+    docV: 0,
+    docMode: 'kampung'
 };
 
-const $=id=>document.getElementById(id);
-const esc=x=>String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const $ = id => document.getElementById(id);
+const esc = x => String(x ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 
-// ===== FUNGSI TANGGAL (LOGIKA DATE OBJECT) =====
-const dates=(startStr, endStr)=>{
-    if(!startStr || !endStr) return [];
+// ===== FUNGSI TANGGAL =====
+const dates = (startStr, endStr) => {
+    if (!startStr || !endStr) return [];
     let partsA = startStr.split('/');
     let partsB = endStr.split('/');
-    let start = new Date(parseInt(partsA[2]), parseInt(partsA[1])-1, parseInt(partsA[0]));
-    let end = new Date(parseInt(partsB[2]), parseInt(partsB[1])-1, parseInt(partsB[0]));
-    if(isNaN(start.getTime()) || isNaN(end.getTime())) return [];
+    let start = new Date(parseInt(partsA[2]), parseInt(partsA[1]) - 1, parseInt(partsA[0]));
+    let end = new Date(parseInt(partsB[2]), parseInt(partsB[1]) - 1, parseInt(partsB[0]));
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return [];
     let r = [];
     let cur = new Date(start);
-    while(cur <= end){
-        let d = String(cur.getDate()).padStart(2,'0');
-        let m = String(cur.getMonth()+1).padStart(2,'0');
+    while (cur <= end) {
+        let d = String(cur.getDate()).padStart(2, '0');
+        let m = String(cur.getMonth() + 1).padStart(2, '0');
         let y = cur.getFullYear();
         r.push(`${d}/${m}/${y}`);
         cur.setDate(cur.getDate() + 1);
@@ -332,77 +332,77 @@ const dates=(startStr, endStr)=>{
     return r;
 };
 
-function fmt(x){
-    if(!x) return "";
+function fmt(x) {
+    if (!x) return "";
     let parts = x.split('/');
-    if(parts.length !== 3) return "";
+    if (parts.length !== 3) return "";
     let day = parseInt(parts[0]);
     let month = parseInt(parts[1]);
     let year = parseInt(parts[2]);
-    if(day < 1 || day > 31 || month < 1 || month > 12) return "";
-    let d = new Date(year, month-1, day);
-    if(isNaN(d.getTime())) return "";
-    let namaBulan = d.toLocaleDateString('id-ID', {month:'long'});
+    if (day < 1 || day > 31 || month < 1 || month > 12) return "";
+    let d = new Date(year, month - 1, day);
+    if (isNaN(d.getTime())) return "";
+    let namaBulan = d.toLocaleDateString('id-ID', { month: 'long' });
     return `${day} ${namaBulan} ${year}`;
 }
 
-function formatDate(dateStr){ return dateStr; }
+function formatDate(dateStr) { return dateStr; }
 
-function parseDate(dateStr){
-    if(!dateStr) return '';
+function parseDate(dateStr) {
+    if (!dateStr) return '';
     let parts = dateStr.split('/');
-    if(parts.length === 3){
-        let day = parts[0].padStart(2,'0');
-        let month = parts[1].padStart(2,'0');
+    if (parts.length === 3) {
+        let day = parts[0].padStart(2, '0');
+        let month = parts[1].padStart(2, '0');
         let year = parts[2];
-        if(year.length === 2) year = '20' + year;
+        if (year.length === 2) year = '20' + year;
         return `${day}/${month}/${year}`;
     }
     return dateStr;
 }
 
-function validateDateFormat(input){
+function validateDateFormat(input) {
     let val = input.value.trim();
-    if(!val) return;
+    if (!val) return;
     let parts = val.split('/');
-    if(parts.length === 3){
+    if (parts.length === 3) {
         let day = parseInt(parts[0]);
         let month = parseInt(parts[1]);
         let year = parseInt(parts[2]);
-        if(day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) return;
+        if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) return;
     }
     input.style.borderColor = 'red';
     setTimeout(() => input.style.borderColor = '', 3000);
 }
 
-function getDateFromInput(input){
+function getDateFromInput(input) {
     let val = input.value.trim();
-    if(!val) return '';
+    if (!val) return '';
     let parts = val.split('/');
-    if(parts.length === 3){
-        let day = parts[0].padStart(2,'0');
-        let month = parts[1].padStart(2,'0');
+    if (parts.length === 3) {
+        let day = parts[0].padStart(2, '0');
+        let month = parts[1].padStart(2, '0');
         let year = parts[2];
-        if(year.length === 2) year = '20' + year;
+        if (year.length === 2) year = '20' + year;
         return `${day}/${month}/${year}`;
     }
     return '';
 }
 
-function formatTanggalRange(tglAwal, tglAkhir){
-    if(!tglAwal || !tglAkhir) return '';
+function formatTanggalRange(tglAwal, tglAkhir) {
+    if (!tglAwal || !tglAkhir) return '';
     let pa = tglAwal.split('/'), pb = tglAkhir.split('/');
-    let dAwal = new Date(parseInt(pa[2]), parseInt(pa[1])-1, parseInt(pa[0]));
-    let dAkhir = new Date(parseInt(pb[2]), parseInt(pb[1])-1, parseInt(pb[0]));
-    if(isNaN(dAwal.getTime()) || isNaN(dAkhir.getTime())) return '';
+    let dAwal = new Date(parseInt(pa[2]), parseInt(pa[1]) - 1, parseInt(pa[0]));
+    let dAkhir = new Date(parseInt(pb[2]), parseInt(pb[1]) - 1, parseInt(pb[0]));
+    if (isNaN(dAwal.getTime()) || isNaN(dAkhir.getTime())) return '';
     let hariAwal = dAwal.getDate();
-    let bulanAwal = dAwal.toLocaleDateString('id-ID', {month:'long'});
+    let bulanAwal = dAwal.toLocaleDateString('id-ID', { month: 'long' });
     let tahunAwal = dAwal.getFullYear();
     let hariAkhir = dAkhir.getDate();
-    let bulanAkhir = dAkhir.toLocaleDateString('id-ID', {month:'long'});
+    let bulanAkhir = dAkhir.toLocaleDateString('id-ID', { month: 'long' });
     let tahunAkhir = dAkhir.getFullYear();
-    if(tahunAwal === tahunAkhir){
-        if(bulanAwal === bulanAkhir){
+    if (tahunAwal === tahunAkhir) {
+        if (bulanAwal === bulanAkhir) {
             return `${hariAwal} s.d. ${hariAkhir} ${bulanAwal} ${tahunAwal}`;
         } else {
             return `${hariAwal} ${bulanAwal} s.d. ${hariAkhir} ${bulanAkhir} ${tahunAwal}`;
@@ -416,21 +416,20 @@ function formatTanggalRange(tglAwal, tglAkhir){
 const CLOUDINARY_CLOUD_NAME = "uxr4cmqd";
 const CLOUDINARY_UPLOAD_PRESET = "Laporan";
 
-// ===== FUNGSI UPLOAD KE CLOUDINARY =====
 function uploadFileToCloudinary(file, isImage, callback) {
     let formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-    let endpoint = isImage 
-        ? `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload` 
+    let endpoint = isImage
+        ? `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`
         : `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/raw/upload`;
     fetch(endpoint, { method: 'POST', body: formData })
-    .then(r=>r.json())
-    .then(data=>{
-        if(data.secure_url) callback(data.secure_url, data.display_name||data.original_filename);
-        else alert("Upload gagal: "+(data.error?data.error.message:"Error tidak diketahui"));
-    })
-    .catch(err=>{ console.error(err); alert("Error koneksi ke Cloudinary: "+err.message); });
+        .then(r => r.json())
+        .then(data => {
+            if (data.secure_url) callback(data.secure_url, data.display_name || data.original_filename);
+            else alert("Upload gagal: " + (data.error ? data.error.message : "Error tidak diketahui"));
+        })
+        .catch(err => { console.error(err); alert("Error koneksi ke Cloudinary: " + err.message); });
 }
 
 function resizeImageToHeight(src, targetHeightCm, callback) {
@@ -451,29 +450,29 @@ function resizeImageToHeight(src, targetHeightCm, callback) {
 }
 
 // ===== RENDER PETUGAS =====
-function renderPetugas(){
+function renderPetugas() {
     const container = document.getElementById('petugas-container');
-    if(!Array.isArray(S.petugas) || S.petugas.length === 0) S.petugas = [''];
-    S.petugas = S.petugas.map(p=>p||'').filter(p=>p!==undefined);
-    if(S.petugas.length===0) S.petugas=[''];
-    container.innerHTML = S.petugas.map((p,i)=>`
+    if (!Array.isArray(S.petugas) || S.petugas.length === 0) S.petugas = [''];
+    S.petugas = S.petugas.map(p => p || '').filter(p => p !== undefined);
+    if (S.petugas.length === 0) S.petugas = [''];
+    container.innerHTML = S.petugas.map((p, i) => `
         <div class="card">
             <div class="head"><b>Petugas ${i+1}</b><button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="removePetugas(${i})">Hapus</button></div>
             <div><input type="text" value="${esc(p)}" placeholder="Nama petugas" onchange="updatePetugas(${i}, this.value)"></div>
         </div>
     `).join('');
 }
-function addPetugas(){ S.petugas.push(''); renderPetugas(); renderWilayah(); }
-function removePetugas(index){ if(S.petugas.length<=1){alert('Minimal 1 petugas!');return;} S.petugas.splice(index,1); renderPetugas(); renderWilayah(); }
-function updatePetugas(index,value){ S.petugas[index]=value.trim(); renderWilayah(); }
+function addPetugas() { S.petugas.push(''); renderPetugas(); renderWilayah(); }
+function removePetugas(index) { if (S.petugas.length <= 1) { alert('Minimal 1 petugas!'); return; } S.petugas.splice(index, 1); renderPetugas(); renderWilayah(); }
+function updatePetugas(index, value) { S.petugas[index] = value.trim(); renderWilayah(); }
 
 // ===== KAMPUNG =====
-function addKampung(v={}){
-    S.kampung.push({kampung:v.kampung||"", distrik:v.distrik||"", mengetahui:v.mengetahui||"", jabatan:v.jabatan||""});
+function addKampung(v = {}) {
+    S.kampung.push({ kampung: v.kampung || "", distrik: v.distrik || "", mengetahui: v.mengetahui || "", jabatan: v.jabatan || "" });
     renderKampung();
 }
 function renderKampung() {
-    $("kampung").innerHTML = S.kampung.map((x,i)=>`
+    $("kampung").innerHTML = S.kampung.map((x, i) => `
         <div class="card">
             <div class="head"><b>Kampung ${i+1}</b><button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="S.kampung.splice(${i},1);renderKampung();renderWilayah()">Hapus</button></div>
             <div class="cols-5">
@@ -487,20 +486,20 @@ function renderKampung() {
 }
 
 // ===== WILAYAH =====
-function addWilayah(v={}){
+function addWilayah(v = {}) {
     S.wilayah.push({
-        kampung:v.kampung||"", sls:v.sls||"", ppl:v.ppl||"",
-        start:v.start||"", end:v.end||"",
-        assignmentTotal: v.assignmentTotal||0, bkuTotal: v.bkuTotal||0,
-        keluargaTotal: v.keluargaTotal||0, bangunanTotal: v.bangunanTotal||0, usahaTotal: v.usahaTotal||0
+        kampung: v.kampung || "", sls: v.sls || "", ppl: v.ppl || "",
+        start: v.start || "", end: v.end || "",
+        assignmentTotal: v.assignmentTotal || 0, bkuTotal: v.bkuTotal || 0,
+        keluargaTotal: v.keluargaTotal || 0, bangunanTotal: v.bangunanTotal || 0, usahaTotal: v.usahaTotal || 0
     });
     renderWilayah();
 }
 function renderWilayah() {
     let html = '';
-    S.wilayah.forEach((x,i)=>{
-        let kampungOpts = S.kampung.map(k=>`<option value="${esc(k.kampung)}" ${k.kampung===x.kampung?'selected':''}>${esc(k.kampung)}</option>`).join('');
-        let pplOpts = S.petugas.map(p=>`<option value="${esc(p)}" ${p===x.ppl?'selected':''}>${esc(p)}</option>`).join('');
+    S.wilayah.forEach((x, i) => {
+        let kampungOpts = S.kampung.map(k => `<option value="${esc(k.kampung)}" ${k.kampung === x.kampung ? 'selected' : ''}>${esc(k.kampung)}</option>`).join('');
+        let pplOpts = S.petugas.map(p => `<option value="${esc(p)}" ${p === x.ppl ? 'selected' : ''}>${esc(p)}</option>`).join('');
         let startDisplay = formatDate(x.start);
         let endDisplay = formatDate(x.end);
         html += `<div class="card">
@@ -524,112 +523,107 @@ function renderWilayah() {
     $("wilayah").innerHTML = html;
 }
 
-function group(){
+function group() {
     let m = new Map();
-    S.wilayah.forEach(w=>{
-        if(!m.has(w.kampung)){
-            let k = S.kampung.find(z=>z.kampung===w.kampung)||{};
-            m.set(w.kampung, {name:w.kampung, distrik:w.distrik||k.distrik||"", items:[]});
+    S.wilayah.forEach(w => {
+        if (!m.has(w.kampung)) {
+            let k = S.kampung.find(z => z.kampung === w.kampung) || {};
+            m.set(w.kampung, { name: w.kampung, distrik: w.distrik || k.distrik || "", items: [] });
         }
         m.get(w.kampung).items.push(w);
     });
     let result = [...m.values()];
-    result.sort((a,b)=>{
-        let aStart = a.items.map(w=>w.start).sort((x,y)=>{
-            let px=x.split('/'), py=y.split('/');
-            let dx=new Date(px[2], px[1]-1, px[0]);
-            let dy=new Date(py[2], py[1]-1, py[0]);
-            return dx-dy;
+    result.sort((a, b) => {
+        let aStart = a.items.map(w => w.start).sort((x, y) => {
+            let px = x.split('/'), py = y.split('/');
+            let dx = new Date(px[2], px[1] - 1, px[0]);
+            let dy = new Date(py[2], py[1] - 1, py[0]);
+            return dx - dy;
         })[0];
-        let bStart = b.items.map(w=>w.start).sort((x,y)=>{
-            let px=x.split('/'), py=y.split('/');
-            let dx=new Date(px[2], px[1]-1, px[0]);
-            let dy=new Date(py[2], py[1]-1, py[0]);
-            return dx-dy;
+        let bStart = b.items.map(w => w.start).sort((x, y) => {
+            let px = x.split('/'), py = y.split('/');
+            let dx = new Date(px[2], px[1] - 1, px[0]);
+            let dy = new Date(py[2], py[1] - 1, py[0]);
+            return dx - dy;
         })[0];
-        let pa=aStart.split('/'), pb=bStart.split('/');
-        let da=new Date(pa[2], pa[1]-1, pa[0]);
-        let db=new Date(pb[2], pb[1]-1, pb[0]);
-        return da-db;
+        let pa = aStart.split('/'), pb = bStart.split('/');
+        let da = new Date(pa[2], pa[1] - 1, pa[0]);
+        let db = new Date(pb[2], pb[1] - 1, pb[0]);
+        return da - db;
     });
     return result;
 }
 
-function validate(){
-    let petugasNama = S.petugas.filter(p=>p.trim()).join(', ');
+function validate() {
+    let petugasNama = S.petugas.filter(p => p.trim()).join(', ');
     S.tujuan = document.getElementById('tujuan').value.trim();
     S.tanggalAwal = getDateFromInput(document.getElementById('tanggalAwal'));
     S.tanggalAkhir = getDateFromInput(document.getElementById('tanggalAkhir'));
     S.perihal = document.getElementById('perihal').value.trim();
     S.nomorSurat = document.getElementById('nomorSurat').value.trim();
-    if(!S.petugas.length || !S.petugas.some(p=>p.trim())) return "Nama petugas belum diisi.";
-    if(!S.tujuan) return "Tujuan belum diisi.";
-    if(!S.perihal) return "Perihal belum diisi.";
-    if(!S.nomorSurat) return "Nomor Surat Tugas belum diisi.";
-    if(!S.kampung.length) return "Tambahkan kampung.";
-    if(!S.wilayah.length) return "Tambahkan wilayah tugas.";
-    for(let i=0;i<S.wilayah.length;i++){
-        let w=S.wilayah[i];
-        if(!w.kampung||!w.sls||!w.ppl||!w.start||!w.end) return `Wilayah Tugas ${i+1} belum lengkap.`;
-        let pa=w.start.split('/'), pb=w.end.split('/');
-        let startDate=new Date(pa[2], pa[1]-1, pa[0]);
-        let endDate=new Date(pb[2], pb[1]-1, pb[0]);
-        if(startDate>endDate) return `Tanggal Wilayah Tugas ${i+1} salah.`;
+    if (!S.petugas.length || !S.petugas.some(p => p.trim())) return "Nama petugas belum diisi.";
+    if (!S.tujuan) return "Tujuan belum diisi.";
+    if (!S.perihal) return "Perihal belum diisi.";
+    if (!S.nomorSurat) return "Nomor Surat Tugas belum diisi.";
+    if (!S.kampung.length) return "Tambahkan kampung.";
+    if (!S.wilayah.length) return "Tambahkan wilayah tugas.";
+    for (let i = 0; i < S.wilayah.length; i++) {
+        let w = S.wilayah[i];
+        if (!w.kampung || !w.sls || !w.ppl || !w.start || !w.end) return `Wilayah Tugas ${i+1} belum lengkap.`;
+        let pa = w.start.split('/'), pb = w.end.split('/');
+        let startDate = new Date(pa[2], pa[1] - 1, pa[0]);
+        let endDate = new Date(pb[2], pb[1] - 1, pb[0]);
+        if (startDate > endDate) return `Tanggal Wilayah Tugas ${i+1} salah.`;
     }
     return "";
 }
 
-// ===== GENERATE (PER-KAMPUNG) =====
-function generate(){
-    let e=validate();
-    if(e){ $("status").innerHTML=`<div class="status err">${esc(e)}</div>`; return; }
+// ===== GENERATE =====
+function generate() {
+    let e = validate();
+    if (e) { $("status").innerHTML = `<div class="status err">${esc(e)}</div>`; return; }
     let vs = group();
-    // Reset data
     S.p = {};
-    vs.forEach(v=>{
+    vs.forEach(v => {
         S.p[v.name] = {};
-        // Buat daftar tanggal unik untuk kampung ini
         let allDates = [];
-        v.items.forEach(w=>{
+        v.items.forEach(w => {
             let days = dates(w.start, w.end);
-            days.forEach(d=>{ if(!allDates.includes(d)) allDates.push(d); });
+            days.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
         });
-        allDates.sort((a,b)=>{
-            let pa=a.split('/'), pb=b.split('/');
-            let da=new Date(pa[2], pa[1]-1, pa[0]);
-            let db=new Date(pb[2], pb[1]-1, pb[0]);
-            return da-db;
+        allDates.sort((a, b) => {
+            let pa = a.split('/'), pb = b.split('/');
+            let da = new Date(pa[2], pa[1] - 1, pa[0]);
+            let db = new Date(pb[2], pb[1] - 1, pb[0]);
+            return da - db;
         });
-        allDates.forEach((d, idx)=>{
+        allDates.forEach((d, idx) => {
             let isFirstDayOfFirstKampung = (v.name === vs[0].name && idx === 0);
             if (isFirstDayOfFirstKampung) {
-                // Hari pertama kampung pertama: kosong, tidak ada items
                 S.p[v.name][d] = {};
                 return;
             }
-            // Hari lainnya: buat items
-            S.p[v.name][d] = { notes:"", items:{} };
-            v.items.filter(w=>d>=w.start&&d<=w.end).forEach(w=>{
-                let k = w.sls+"||"+w.ppl;
+            S.p[v.name][d] = { notes: "", items: {} };
+            v.items.filter(w => d >= w.start && d <= w.end).forEach(w => {
+                let k = w.sls + "||" + w.ppl;
                 let days = dates(w.start, w.end).length;
-                if(days===0) days=1;
-                let assignVal=0, bkuVal=0, keluargaVal=0, bangunanVal=0, usahaVal=0;
-                // Hari terakhir kampung ini: 10%
-                if (d === allDates[allDates.length-1]) {
-                    assignVal = Math.floor((w.assignmentTotal||0) / days * 0.1);
-                    bkuVal = Math.floor((w.bkuTotal||0) / days * 0.1);
-                    keluargaVal = Math.floor((w.keluargaTotal||0) / days * 0.1);
-                    bangunanVal = Math.floor((w.bangunanTotal||0) / days * 0.1);
-                    usahaVal = Math.floor((w.usahaTotal||0) / days * 0.1);
+                if (days === 0) days = 1;
+                let assignVal = 0, bkuVal = 0, keluargaVal = 0, bangunanVal = 0, usahaVal = 0;
+                if (d === allDates[allDates.length - 1]) {
+                    assignVal = Math.floor((w.assignmentTotal || 0) / days * 0.1);
+                    bkuVal = Math.floor((w.bkuTotal || 0) / days * 0.1);
+                    keluargaVal = Math.floor((w.keluargaTotal || 0) / days * 0.1);
+                    bangunanVal = Math.floor((w.bangunanTotal || 0) / days * 0.1);
+                    usahaVal = Math.floor((w.usahaTotal || 0) / days * 0.1);
                 } else {
-                    assignVal = Math.round((w.assignmentTotal||0) / days);
-                    bkuVal = Math.round((w.bkuTotal||0) / days);
-                    keluargaVal = Math.round((w.keluargaTotal||0) / days);
-                    bangunanVal = Math.round((w.bangunanTotal||0) / days);
-                    usahaVal = Math.round((w.usahaTotal||0) / days);
+                    assignVal = Math.round((w.assignmentTotal || 0) / days);
+                    bkuVal = Math.round((w.bkuTotal || 0) / days);
+                    keluargaVal = Math.round((w.keluargaTotal || 0) / days);
+                    bangunanVal = Math.round((w.bangunanTotal || 0) / days);
+                    usahaVal = Math.round((w.usahaTotal || 0) / days);
                 }
                 S.p[v.name][d].items[k] = {
-                    sls:w.sls, ppl:w.ppl,
+                    sls: w.sls, ppl: w.ppl,
                     assignment: assignVal,
                     bku: bkuVal,
                     keluarga: keluargaVal,
@@ -640,36 +634,36 @@ function generate(){
             });
         });
     });
-    S.v=0; S.docV=0; S.docMode='kampung';
+    S.v = 0; S.docV = 0; S.docMode = 'kampung';
     renderProgress(); renderDokumentasi();
     $("progress").classList.remove("hidden");
     $("status").innerHTML = '<div class="status">✅ Form progres dan dokumentasi berhasil digenerate.</div>';
 }
 
 // ===== PROGRESS =====
-function setVal(v,d,k,f,val){ S.p[v][d].items[k][f]=val; }
-function metric(v,d,k,f,n){
-    let x=S.p[v][d].items[k];
+function setVal(v, d, k, f, val) { S.p[v][d].items[k][f] = val; }
+function metric(v, d, k, f, n) {
+    let x = S.p[v][d].items[k];
     return `<div><label>${n}</label><input type="number" min="0" value="${esc(x[f])}" onchange="setVal('${esc(v)}','${d}','${esc(k)}','${f}',this.value)"></div>`;
 }
-function renderProgress(){
-    let vs=group(), v=vs[S.v], ds=Object.keys(S.p[v.name]).sort();
-    $("nav").innerHTML=vs.map((x,i)=>`<button class="pill ${i===S.v?"active":""}" onclick="S.v=${i};renderProgress()">${i+1}. ${esc(x.name)}</button>`).join("");
-    let h=`<div class="card"><h3 style="margin:0">${esc(v.name)}</h3><small>Distrik ${esc(v.distrik)}</small></div>`;
-    ds.forEach((d,i)=>{
+function renderProgress() {
+    let vs = group(), v = vs[S.v], ds = Object.keys(S.p[v.name]).sort();
+    $("nav").innerHTML = vs.map((x, i) => `<button class="pill ${i===S.v?'active':''}" onclick="S.v=${i};renderProgress()">${i+1}. ${esc(x.name)}</button>`).join("");
+    let h = `<div class="card"><h3 style="margin:0">${esc(v.name)}</h3><small>Distrik ${esc(v.distrik)}</small></div>`;
+    ds.forEach((d, i) => {
         let last = i === ds.length - 1;
         let isLastKampung = S.v === vs.length - 1;
         let labelLast = "";
         if (last && !isLastKampung) labelLast = " — HARI TERAKHIR KAMPUNG (SEBELUM PINDAH)";
         else if (last && isLastKampung) labelLast = " — HARI TERAKHIR KAMPUNG (PENUTUPAN)";
-        h+=`<div class="day ${last?"last":""}"><h4>${fmt(d)}${labelLast}</h4><div class="daybody">`;
+        h += `<div class="day ${last?"last":""}"><h4>${fmt(d)}${labelLast}</h4><div class="daybody">`;
         let items = S.p[v.name][d].items;
         if (items && Object.keys(items).length > 0) {
-            v.items.filter(w=>d>=w.start&&d<=w.end).forEach(w=>{
-                let k=w.sls+"||"+w.ppl;
-                let x=items[k];
+            v.items.filter(w => d >= w.start && d <= w.end).forEach(w => {
+                let k = w.sls + "||" + w.ppl;
+                let x = items[k];
                 if (x) {
-                    h+=`<div class="sls"><b>${esc(w.sls)} — ${esc(w.ppl)}</b><div class="metrics">
+                    h += `<div class="sls"><b>${esc(w.sls)} — ${esc(w.ppl)}</b><div class="metrics">
                         ${metric(v.name,d,k,"assignment","Assignment")}
                         ${metric(v.name,d,k,"bku","BKU")}
                         ${metric(v.name,d,k,"keluarga","Keluarga")}
@@ -680,31 +674,31 @@ function renderProgress(){
                 }
             });
         }
-        h+=`</div></div>`;
+        h += `</div></div>`;
     });
-    h+=`<div class="row" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px">
+    h += `<div class="row" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px">
         <button class="btn" onclick="save()">💾 Simpan</button>
         ${S.v?`<button class="btn" onclick="S.v--;renderProgress()">◀ Sebelumnya</button>`:''}
         ${S.v<vs.length-1?`<button class="btn btn-primary" onclick="S.v++;renderProgress()">Selanjutnya ▶</button>`:`<button class="btn btn-success" onclick="preview()">👁 Preview Word</button>`}
     </div>`;
-    $("content").innerHTML=h;
+    $("content").innerHTML = h;
 }
 
 // ===== DOKUMENTASI =====
-function renderDokumentasi(){
+function renderDokumentasi() {
     let vs = group();
-    if(vs.length === 0){ $("docNav").innerHTML = '<p style="color:#999">Belum ada kampung. Generate form progres terlebih dahulu.</p>'; $("docContent").innerHTML = ''; return; }
-    let navHTML = vs.map((x,i)=>`
+    if (vs.length === 0) { $("docNav").innerHTML = '<p style="color:#999">Belum ada kampung. Generate form progres terlebih dahulu.</p>'; $("docContent").innerHTML = ''; return; }
+    let navHTML = vs.map((x, i) => `
         <button class="pill ${S.docMode==='kampung' && i===S.docV?'active':''}" onclick="S.docMode='kampung';S.docV=${i};renderDokumentasi()">${i+1}. ${esc(x.name)}</button>
     `).join('');
     navHTML += `<button class="pill ${S.docMode==='perahu'?'active':''}" onclick="S.docMode='perahu';renderDokumentasi()" style="background:#0C3B63; color:white; font-weight:bold;">🚤 Perahu</button>`;
     $("docNav").innerHTML = navHTML;
-    if(S.docMode === 'perahu'){
-        if(!S.photos["Perahu"] || S.photos["Perahu"].length === 0) S.photos["Perahu"] = [{src:"", caption:"Dokumentasi diatas perahu"},{src:"", caption:"Foto KTP Motoris"}];
+    if (S.docMode === 'perahu') {
+        if (!S.photos["Perahu"] || S.photos["Perahu"].length === 0) S.photos["Perahu"] = [{ src: "", caption: "Dokumentasi diatas perahu" }, { src: "", caption: "Foto KTP Motoris" }];
         renderDokumentasiPerahu(); return;
     }
     let v = vs[S.docV];
-    if(!S.photos[v.name]) S.photos[v.name] = [{src:"",caption:""}];
+    if (!S.photos[v.name]) S.photos[v.name] = [{ src: "", caption: "" }];
     let h = `<div class="card"><h3 style="margin:0">${esc(v.name)}</h3><small>Distrik ${esc(v.distrik)}</small></div>`;
     h += `<div class="photo-grid">`;
     S.photos[v.name].forEach((p, i) => {
@@ -723,9 +717,9 @@ function renderDokumentasi(){
     </div>`;
     $("docContent").innerHTML = h;
 }
-function renderDokumentasiPerahu(){
+function renderDokumentasiPerahu() {
     let perahuPhotos = S.photos["Perahu"] || [];
-    if(perahuPhotos.length === 0) perahuPhotos = [{src:"", caption:"Dokumentasi diatas perahu"},{src:"", caption:"Foto KTP Motoris"}];
+    if (perahuPhotos.length === 0) perahuPhotos = [{ src: "", caption: "Dokumentasi diatas perahu" }, { src: "", caption: "Foto KTP Motoris" }];
     S.photos["Perahu"] = perahuPhotos;
     let h = `<div class="card"><h3 style="margin:0">🚤 Dokumentasi Perahu</h3><small>Dokumentasi perjalanan dinas menggunakan perahu</small></div>`;
     h += `<div class="photo-grid">`;
@@ -744,30 +738,29 @@ function renderDokumentasiPerahu(){
     </div>`;
     $("docContent").innerHTML = h;
 }
-function addPhotoPerahu(){ S.photos["Perahu"].push({src:"",caption:""}); renderDokumentasiPerahu(); }
-function removePhotoPerahu(index){ if(S.photos["Perahu"].length<=1){alert('Minimal 1 gambar perahu!');return;} S.photos["Perahu"].splice(index,1); renderDokumentasiPerahu(); }
-function uploadPhotoPerahu(index, input){ let file=input.files[0]; if(!file)return; $("status").innerHTML='<div class="status">📤 Upload gambar perahu ke Cloudinary...</div>'; uploadFileToCloudinary(file,true,function(imageUrl){S.photos["Perahu"][index].src=imageUrl; renderDokumentasiPerahu(); $("status").innerHTML='<div class="status">✅ Gambar perahu berhasil diupload!</div>'; }); }
-function updateCaptionPerahu(index,value){ S.photos["Perahu"][index].caption=value; }
-function addPhoto(index){ let vs=group(); let v=vs[index]; if(!S.photos[v.name]) S.photos[v.name]=[]; S.photos[v.name].push({src:"",caption:""}); renderDokumentasi(); }
-function removePhoto(index,photoIndex){ let vs=group(); let v=vs[index]; if(S.photos[v.name].length<=1){alert('Minimal 1 gambar per kampung!');return;} S.photos[v.name].splice(photoIndex,1); renderDokumentasi(); }
-function uploadPhoto(index,photoIndex,input){ let file=input.files[0]; if(!file)return; $("status").innerHTML='<div class="status">📤 Upload gambar ke Cloudinary...</div>'; uploadFileToCloudinary(file,true,function(imageUrl){let vs=group(); let v=vs[index]; S.photos[v.name][photoIndex].src=imageUrl; renderDokumentasi(); $("status").innerHTML='<div class="status">✅ Gambar berhasil diupload!</div>'; }); }
-function updateCaption(index,photoIndex,value){ let vs=group(); let v=vs[index]; S.photos[v.name][photoIndex].caption=value; }
+function addPhotoPerahu() { S.photos["Perahu"].push({ src: "", caption: "" }); renderDokumentasiPerahu(); }
+function removePhotoPerahu(index) { if (S.photos["Perahu"].length <= 1) { alert('Minimal 1 gambar perahu!'); return; } S.photos["Perahu"].splice(index, 1); renderDokumentasiPerahu(); }
+function uploadPhotoPerahu(index, input) { let file = input.files[0]; if (!file) return; $("status").innerHTML = '<div class="status">📤 Upload gambar perahu ke Cloudinary...</div>'; uploadFileToCloudinary(file, true, function(imageUrl) { S.photos["Perahu"][index].src = imageUrl; renderDokumentasiPerahu(); $("status").innerHTML = '<div class="status">✅ Gambar perahu berhasil diupload!</div>'; }); }
+function updateCaptionPerahu(index, value) { S.photos["Perahu"][index].caption = value; }
+function addPhoto(index) { let vs = group(); let v = vs[index]; if (!S.photos[v.name]) S.photos[v.name] = []; S.photos[v.name].push({ src: "", caption: "" }); renderDokumentasi(); }
+function removePhoto(index, photoIndex) { let vs = group(); let v = vs[index]; if (S.photos[v.name].length <= 1) { alert('Minimal 1 gambar per kampung!'); return; } S.photos[v.name].splice(photoIndex, 1); renderDokumentasi(); }
+function uploadPhoto(index, photoIndex, input) { let file = input.files[0]; if (!file) return; $("status").innerHTML = '<div class="status">📤 Upload gambar ke Cloudinary...</div>'; uploadFileToCloudinary(file, true, function(imageUrl) { let vs = group(); let v = vs[index]; S.photos[v.name][photoIndex].src = imageUrl; renderDokumentasi(); $("status").innerHTML = '<div class="status">✅ Gambar berhasil diupload!</div>'; }); }
+function updateCaption(index, photoIndex, value) { let vs = group(); let v = vs[index]; S.photos[v.name][photoIndex].caption = value; }
 
-// ===== NARRATIVE FOR TABLE (PER-KAMPUNG) =====
-function generateNarrativeTable(){
+// ===== NARRATIVE FOR TABLE =====
+function generateNarrativeTable() {
     let out = "";
     let vs = group();
     let totalKampung = vs.length;
-    
     vs.forEach((v, vi) => {
         let aparatData = S.kampung.find(k => k.kampung === v.name);
         let namaAparat = aparatData && aparatData.mengetahui ? aparatData.mengetahui : "Kepala Kampung";
         let jabatanAparat = aparatData && aparatData.jabatan ? aparatData.jabatan : "Kepala Kampung";
-        let ds = Object.keys(S.p[v.name]||{}).sort((a,b)=>{
-            let pa=a.split('/'), pb=b.split('/');
-            let da=new Date(pa[2], pa[1]-1, pa[0]);
-            let db=new Date(pb[2], pb[1]-1, pb[0]);
-            return da-db;
+        let ds = Object.keys(S.p[v.name] || {}).sort((a, b) => {
+            let pa = a.split('/'), pb = b.split('/');
+            let da = new Date(pa[2], pa[1] - 1, pa[0]);
+            let db = new Date(pb[2], pb[1] - 1, pb[0]);
+            return da - db;
         });
         ds.forEach((d, di) => {
             let isFirstDayInKampung = (di === 0);
@@ -775,10 +768,8 @@ function generateNarrativeTable(){
             let isLastKampung = (vi === totalKampung - 1);
             let isFinalDay = isLastKampung && isLastDayInKampung;
             let isFirstDayOfFirstKampung = (vi === 0 && isFirstDayInKampung);
-            
             out += `<p style="margin-top:12pt;margin-bottom:0pt;text-align:justify;"><b>${fmt(d)}</b></p>`;
             out += `<ul style="margin-top:3pt;margin-bottom:0pt;padding-left:20pt;text-align:justify;">`;
-            
             if (isFirstDayOfFirstKampung) {
                 out += `<li style="text-align:justify;margin-bottom:3pt;">Tim berangkat dari Waisai menuju ${esc(v.name)}, Distrik ${esc(v.distrik)}, menggunakan transportasi perahu motor. Tim tiba di kampung tujuan dan mempersiapkan pelaksanaan pendataan lapangan.</li>`;
                 out += `<li style="text-align:justify;margin-bottom:3pt;">Tim menemui Bapak ${esc(namaAparat)} selaku ${esc(jabatanAparat)} ${esc(v.name)}.</li>`;
@@ -793,7 +784,6 @@ function generateNarrativeTable(){
             } else {
                 out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melanjutkan kegiatan pendataan door to door pada wilayah tugas masing-masing.</li>`;
             }
-            
             if (!isFirstDayOfFirstKampung) {
                 let items = S.p[v.name][d].items;
                 if (items && Object.keys(items).length > 0) {
@@ -812,7 +802,6 @@ function generateNarrativeTable(){
                     });
                 }
             }
-            
             if (isFinalDay) {
                 out += `<li style="text-align:justify;margin-bottom:3pt;">Tim melakukan check assignment dan memastikan isian kampung terakhir (${esc(v.name)}) sebelum kembali ke Waisai.</li>`;
                 out += `<li style="text-align:justify;margin-bottom:3pt;">Petugas melakukan pengecekan administrasi dan kelengkapan hasil pendataan sebagai tahap akhir kegiatan lapangan.</li>`;
@@ -831,7 +820,7 @@ function generateNarrativeTable(){
 }
 
 // ===== PREVIEW & DOWNLOAD WORD =====
-function generateWordHTML(resizedImages){
+function generateWordHTML(resizedImages) {
     let docHtml = '';
     let vs = group();
     let tujuan = esc(document.getElementById('tujuan').value.trim());
@@ -876,32 +865,55 @@ function generateWordHTML(resizedImages){
     return docHtml;
 }
 
-function preview(){ if(validate()){alert(validate());return;} let previewDiv=document.getElementById('preview'); previewDiv.innerHTML=generateWordHTML(null); previewDiv.classList.add('visible'); setTimeout(()=>{ previewDiv.scrollIntoView({behavior:'smooth',block:'start'}); },100); }
+function preview(){
+    try {
+        if(validate()){alert(validate());return;}
+        let previewDiv=document.getElementById('preview');
+        previewDiv.innerHTML=generateWordHTML(null);
+        previewDiv.classList.add('visible');
+        setTimeout(()=>{
+            previewDiv.scrollIntoView({behavior:'smooth',block:'start'});
+        },100);
+    } catch (err) {
+        console.error("Error saat Preview:", err);
+        alert("Terjadi error saat membuat preview. Silakan cek data input atau konsol browser (F12).");
+    }
+}
 
 // ===== FUNGSI DOWNLOAD WORD =====
 function word(){
-    if(validate()){alert(validate());return;}
-    let vs=group(); let imagesToResize=[]; let imageKeys=[];
-    vs.forEach(v=>{ let photos=S.photos[v.name]||[]; photos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push(v.name+'_'+idx); }}); });
-    let perahuPhotos=S.photos["Perahu"]||[]; perahuPhotos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push('Perahu_'+idx); }});
-    if(imagesToResize.length===0){ generateOfflineWordAndBackup({}); return; }
-    $("status").innerHTML='<div class="status">⏳ Mengunduh gambar dari Cloudinary...</div>';
-    let resizedImages={}; let completed=0; let total=imagesToResize.length;
-    imagesToResize.forEach((src,idx)=>{
-        fetch(src).then(response=>{ if(!response.ok) throw new Error("Gagal fetch"); return response.blob(); }).then(blob=>{
-            let reader=new FileReader(); reader.onloadend=function(){ let base64Data=reader.result; let key=imageKeys[idx]; resizeImageToHeight(base64Data,9.2,function(resizedSrc){ resizedImages[key]=resizedSrc; completed++; checkComplete(); }); }; reader.readAsDataURL(blob);
-        }).catch(err=>{ console.warn("Gagal download gambar: ",src); completed++; checkComplete(); });
-    });
-    function checkComplete(){ if(completed===total){ $("status").innerHTML='<div class="status">⏳ Membuat file Word...</div>'; setTimeout(()=>{ generateOfflineWordAndBackup(resizedImages); },500); } }
+    try {
+        if(validate()){alert(validate());return;}
+        let vs=group(); let imagesToResize=[]; let imageKeys=[];
+        vs.forEach(v=>{ let photos=S.photos[v.name]||[]; photos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push(v.name+'_'+idx); }}); });
+        let perahuPhotos=S.photos["Perahu"]||[]; perahuPhotos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push('Perahu_'+idx); }});
+        if(imagesToResize.length===0){ generateOfflineWordAndBackup({}); return; }
+        $("status").innerHTML='<div class="status">⏳ Mengunduh gambar dari Cloudinary...</div>';
+        let resizedImages={}; let completed=0; let total=imagesToResize.length;
+        imagesToResize.forEach((src,idx)=>{
+            fetch(src).then(response=>{ if(!response.ok) throw new Error("Gagal fetch"); return response.blob(); }).then(blob=>{
+                let reader=new FileReader(); reader.onloadend=function(){ let base64Data=reader.result; let key=imageKeys[idx]; resizeImageToHeight(base64Data,9.2,function(resizedSrc){ resizedImages[key]=resizedSrc; completed++; checkComplete(); }); }; reader.readAsDataURL(blob);
+            }).catch(err=>{ console.warn("Gagal download gambar: ",src); completed++; checkComplete(); });
+        });
+        function checkComplete(){ if(completed===total){ $("status").innerHTML='<div class="status">⏳ Membuat file Word...</div>'; setTimeout(()=>{ generateOfflineWordAndBackup(resizedImages); },500); } }
+    } catch (err) {
+        console.error("Error saat Download Word:", err);
+        alert("Terjadi error saat mendownload Word. Cek konsol browser (F12).");
+    }
 }
 
 // ===== GENERATE WORD + UPLOAD KE CLOUDINARY =====
 function generateOfflineWordAndBackup(resizedImages){
-    let htmlContent=generateWordHTML(resizedImages); let blob=new Blob(["\ufeff"+htmlContent],{type:"application/msword;charset=utf-8"});
-    let pplNames=[]; S.wilayah.forEach(w=>{ if(w.ppl&&w.ppl.trim()&&!pplNames.includes(w.ppl.trim())) pplNames.push(w.ppl.trim()); }); let namaPpl=pplNames.length>0?pplNames[0]:"TanpaNama"; let tanggalSekarang=new Date().toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"}).replace(/\s/g,"_"); let fileName=`Laporan_Perjalanan_Dinas_Tim_${namaPpl}_${tanggalSekarang}.doc`;
-    let link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download=fileName; document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(()=>URL.revokeObjectURL(link.href),1000);
-    $("status").innerHTML='<div class="status">⏳ Mengupload backup Word ke Cloudinary...</div>';
-    uploadFileToCloudinary(blob,false,function(wordUrl,displayName){ if(!S.wordBackupUrl) S.wordBackupUrl=[]; S.wordBackupUrl.push({file:wordUrl,date:new Date().toISOString(),name:fileName,createdBy:namaPpl}); $("status").innerHTML=`<div class="status" style="background:#d4edda; border-color:#28a745;">✅ File Word berhasil didownload & di-backup ke Cloudinary!<br>🔗 <a href="${wordUrl}" target="_blank">Lihat Backup di Cloud</a></div>`; save(); });
+    try {
+        let htmlContent=generateWordHTML(resizedImages); let blob=new Blob(["\ufeff"+htmlContent],{type:"application/msword;charset=utf-8"});
+        let pplNames=[]; S.wilayah.forEach(w=>{ if(w.ppl&&w.ppl.trim()&&!pplNames.includes(w.ppl.trim())) pplNames.push(w.ppl.trim()); }); let namaPpl=pplNames.length>0?pplNames[0]:"TanpaNama"; let tanggalSekarang=new Date().toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"}).replace(/\s/g,"_"); let fileName=`Laporan_Perjalanan_Dinas_Tim_${namaPpl}_${tanggalSekarang}.doc`;
+        let link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download=fileName; document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+        $("status").innerHTML='<div class="status">⏳ Mengupload backup Word ke Cloudinary...</div>';
+        uploadFileToCloudinary(blob,false,function(wordUrl,displayName){ if(!S.wordBackupUrl) S.wordBackupUrl=[]; S.wordBackupUrl.push({file:wordUrl,date:new Date().toISOString(),name:fileName,createdBy:namaPpl}); $("status").innerHTML=`<div class="status" style="background:#d4edda; border-color:#28a745;">✅ File Word berhasil didownload & di-backup ke Cloudinary!<br>🔗 <a href="${wordUrl}" target="_blank">Lihat Backup di Cloud</a></div>`; save(); });
+    } catch (err) {
+        console.error("Error di generateOfflineWordAndBackup:", err);
+        alert("Terjadi error pada proses Word. Cek konsol browser (F12).");
+    }
 }
 
 function generateWordDoc(resizedImages){
@@ -911,7 +923,7 @@ function generateWordDoc(resizedImages){
     $("status").innerHTML='<div class="status" style="background:#d4edda; border-color:#28a745;">✅ File Word berhasil didownload!</div>';
 }
 
-// ===== SAVE & LOAD (INTERNAL BROWSER) =====
+// ===== SAVE & LOAD =====
 function save(){
     S.petugas=S.petugas.map(p=>p.trim()).filter(Boolean); if(S.petugas.length===0) S.petugas=['']; S.tujuan=document.getElementById('tujuan').value.trim(); S.tanggalAwal=getDateFromInput(document.getElementById('tanggalAwal')); S.tanggalAkhir=getDateFromInput(document.getElementById('tanggalAkhir')); S.perihal=document.getElementById('perihal').value.trim(); S.nomorSurat=document.getElementById('nomorSurat').value.trim();
     localStorage.setItem("laporanGenerator",JSON.stringify(S)); $("status").innerHTML='<div class="status">✅ Data tersimpan di browser.</div>'; renderPetugas();
@@ -924,41 +936,307 @@ function load(){
 }
 function resetAll(){ if(confirm("⚠️ Yakin ingin menghapus SEMUA data?")){ localStorage.removeItem("laporanGenerator"); location.reload(); } }
 
-// ===== EXPORT EXCEL (BACKUP) =====
-function exportExcel(){
-    let wb = XLSX.utils.book_new();
-    let utamaData = [["Nama Petugas","Tujuan","Tanggal Awal","Tanggal Akhir","Perihal","Nomor Surat Tugas"]]; utamaData.push([S.petugas.filter(p=>p.trim()).join('; '),S.tujuan||'',S.tanggalAwal||'',S.tanggalAkhir||'',S.perihal||'',S.nomorSurat||'']);
-    let wsUtama = XLSX.utils.aoa_to_sheet(utamaData); XLSX.utils.book_append_sheet(wb, wsUtama, "DATA UTAMA");
-    let kampungData = [["Kampung","Distrik","Mengetahui","Jabatan"]]; S.kampung.forEach(k=>{ kampungData.push([k.kampung||'',k.distrik||'',k.mengetahui||'',k.jabatan||'']); });
-    let wsKampung = XLSX.utils.aoa_to_sheet(kampungData); XLSX.utils.book_append_sheet(wb, wsKampung, "KAMPUNG TUJUAN");
-    let wilayahData = [["Kampung","SLS","Nama PPL","Tanggal Awal","Tanggal Akhir","AssignmentTotal","BKUTotal","KeluargaTotal","BangunanTotal","UsahaTotal"]]; S.wilayah.forEach(w=>{ wilayahData.push([w.kampung||'',w.sls||'',w.ppl||'',w.start||'',w.end||'',w.assignmentTotal||0,w.bkuTotal||0,w.keluargaTotal||0,w.bangunanTotal||0,w.usahaTotal||0]); });
-    let wsWilayah = XLSX.utils.aoa_to_sheet(wilayahData); XLSX.utils.book_append_sheet(wb, wsWilayah, "WILAYAH TUGAS");
-    let progresData = [["Kampung","Tanggal","SLS","PPL","Assignment","BKU","Keluarga","Bangunan Lainnya","Usaha","Catatan SLS"]]; let vs = group(); vs.forEach(v=>{ let ds=Object.keys(S.p[v.name]||{}).sort(); ds.forEach(d=>{ Object.values(S.p[v.name][d].items).forEach(x=>{ progresData.push([v.name,d,x.sls,x.ppl,x.assignment||'0',x.bku||'0',x.keluarga||'0',x.bangunan||'0',x.usaha||'0',x.notes||'']); }); }); });
-    let wsProgres = XLSX.utils.aoa_to_sheet(progresData); XLSX.utils.book_append_sheet(wb, wsProgres, "DATA PROGRES");
-    let dokumenData = [["Kampung","Cloudinary_URL_Gambar","Caption"]]; vs.forEach(v=>{ let photos=S.photos[v.name]||[]; photos.forEach(p=>{ if(p.src) dokumenData.push([v.name,p.src,p.caption||'']); }); }); let perahuPhotos=S.photos["Perahu"]||[]; perahuPhotos.forEach(p=>{ if(p.src) dokumenData.push(["Perahu",p.src,p.caption||'']); });
-    let wsDokumen = XLSX.utils.aoa_to_sheet(dokumenData); XLSX.utils.book_append_sheet(wb, wsDokumen, "DOKUMENTASI");
-    let backupWordData = [["Nama_File","Cloudinary_Word_URL","Tanggal_Dibuat","Dibuat_oleh"]]; if(S.wordBackupUrl&&S.wordBackupUrl.length>0){ S.wordBackupUrl.forEach(w=>{ backupWordData.push([w.name||'',w.file||'',w.date||'',w.createdBy||'']); }); } else { backupWordData.push(["Belum ada backup","","",""]); }
-    let wsBackup = XLSX.utils.aoa_to_sheet(backupWordData); XLSX.utils.book_append_sheet(wb, wsBackup, "BACKUP WORD");
-    let wbout = XLSX.write(wb,{bookType:'xlsx',type:'array'}); let blob=new Blob([wbout],{type:'application/octet-stream'}); let link=document.createElement('a'); link.href=URL.createObjectURL(blob);
-    let pplNames=S.petugas.filter(p=>p.trim()); let ppl1=pplNames.length>0?pplNames[0]:"TanpaNama"; let now=new Date(); let tgl=now.toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"}).replace(/\s/g,"_"); let jam=now.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit",hour12:false}).replace(/:/g,"."); link.download=`Laporan SE Tim ${ppl1} - ${tgl} - ${jam} WIT.xlsx`;
-    link.click(); URL.revokeObjectURL(link.href); $("status").innerHTML='<div class="status">✅ Backup data lengkap berhasil diexport ke Excel (.xlsx).</div>';
+// ===== LEGACY CSV PARSER (untuk backup lama) =====
+function parseCSVLine(line) {
+    let result = [];
+    let current = '';
+    let insideQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        let char = line[i];
+        if (char === '"') {
+            if (insideQuotes && line[i+1] === '"') {
+                current += '"';
+                i++;
+            } else {
+                insideQuotes = !insideQuotes;
+            }
+        } else if (char === ',' && !insideQuotes) {
+            result.push(current.trim());
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    result.push(current.trim());
+    return result;
 }
 
-// ===== IMPORT EXCEL (RESTORE) =====
+function importLegacyCSV(text) {
+    let lines = text.split('\n').map(line => line.replace(/\r$/, '')).filter(line => line.trim() !== '');
+    let section = '';
+    let petugasRaw = '', tujuanVal = '', tanggalAwalVal = '', tanggalAkhirVal = '', perihalVal = '', nomorSuratVal = '';
+    let kampungList = [], wilayahList = [];
+    let progressData = {}, photoData = {};
+    let wordBackupData = [];
+    let importedCount = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i].trim();
+        if (line.startsWith('=== DATA UTAMA ===')) { section = 'utama'; continue; }
+        else if (line.startsWith('=== KAMPUNG TUJUAN ===')) { section = 'kampung'; continue; }
+        else if (line.startsWith('=== WILAYAH TUGAS ===')) { section = 'wilayah'; continue; }
+        else if (line.startsWith('=== DATA PROGRES ===')) { section = 'progres'; continue; }
+        else if (line.startsWith('=== DOKUMENTASI ===')) { section = 'dokumentasi'; continue; }
+        else if (line.startsWith('=== BACKUP WORD ===')) { section = 'backup'; continue; }
+
+        if (section === 'utama') {
+            if (line.startsWith('Nama Petugas,')) petugasRaw = line.substring('Nama Petugas,'.length).trim();
+            else if (line.startsWith('Tujuan,')) tujuanVal = line.substring('Tujuan,'.length).trim();
+            else if (line.startsWith('Tanggal Awal,')) tanggalAwalVal = line.substring('Tanggal Awal,'.length).trim();
+            else if (line.startsWith('Tanggal Akhir,')) tanggalAkhirVal = line.substring('Tanggal Akhir,'.length).trim();
+            else if (line.startsWith('Perihal,')) perihalVal = line.substring('Perihal,'.length).trim();
+            else if (line.startsWith('Nomor Surat Tugas,')) nomorSuratVal = line.substring('Nomor Surat Tugas,'.length).trim();
+        }
+        else if (section === 'kampung') {
+            let parts = parseCSVLine(line);
+            if (parts.length >= 4 && parts[0] && !parts[0].includes('Kampung')) {
+                kampungList.push({ kampung: parts[0], distrik: parts[1] || '', mengetahui: parts[2] || '', jabatan: parts[3] || '' });
+            }
+        }
+        else if (section === 'wilayah') {
+            let parts = parseCSVLine(line);
+            if (parts.length >= 10 && parts[0] && !parts[0].includes('Kampung')) {
+                wilayahList.push({
+                    kampung: parts[0],
+                    sls: parts[1],
+                    ppl: parts[2],
+                    start: parseDate(parts[3]) || '',
+                    end: parseDate(parts[4]) || '',
+                    assignmentTotal: parseInt(parts[5]) || 0,
+                    bkuTotal: parseInt(parts[6]) || 0,
+                    keluargaTotal: parseInt(parts[7]) || 0,
+                    bangunanTotal: parseInt(parts[8]) || 0,
+                    usahaTotal: parseInt(parts[9]) || 0
+                });
+            }
+        }
+        else if (section === 'progres') {
+            let parts = parseCSVLine(line);
+            if (parts.length >= 10 && parts[0] && !parts[0].includes('Kampung')) {
+                let kampung = parts[0], tanggalStr = parts[1], sls = parts[2], ppl = parts[3];
+                let dateObj = new Date(tanggalStr);
+                if (isNaN(dateObj.getTime())) {
+                    let parts2 = tanggalStr.split(' ');
+                    if (parts2.length === 3) {
+                        let monthMap = {'Januari':'01','Februari':'02','Maret':'03','April':'04','Mei':'05','Juni':'06','Juli':'07','Agustus':'08','September':'09','Oktober':'10','November':'11','Desember':'12'};
+                        let day = parts2[0].padStart(2,'0'), month = monthMap[parts2[1]]||'01', year = parts2[2];
+                        if (year.length === 2) year = '20' + year;
+                        tanggalStr = `${year}-${month}-${day}`;
+                    }
+                } else { tanggalStr = dateObj.toISOString().split('T')[0]; }
+                if (!progressData[kampung]) progressData[kampung] = {};
+                if (!progressData[kampung][tanggalStr]) progressData[kampung][tanggalStr] = { notes: "", items: {} };
+                let key = sls + '||' + ppl;
+                progressData[kampung][tanggalStr].items[key] = { sls: sls, ppl: ppl, assignment: parts[4] || '0', bku: parts[5] || '0', keluarga: parts[6] || '0', bangunan: parts[7] || '0', usaha: parts[8] || '0', notes: parts[9] || '' };
+                importedCount++;
+            }
+        }
+        else if (section === 'dokumentasi') {
+            let parts = parseCSVLine(line);
+            if (parts.length >= 3 && parts[0] && !parts[0].includes('Kampung')) {
+                let kampung = parts[0];
+                let src = parts[1] || '';
+                let caption = parts[2] || '';
+                if (src && src.startsWith('http')) {
+                    if (!photoData[kampung]) photoData[kampung] = [];
+                    photoData[kampung].push({ src: src, caption: caption || '' });
+                }
+            }
+        }
+        else if (section === 'backup') {
+            let parts = parseCSVLine(line);
+            if (parts.length >= 4 && parts[0] && !parts[0].includes('Nama_File')) {
+                wordBackupData.push({
+                    name: parts[0],
+                    file: parts[1],
+                    date: parts[2] || '',
+                    createdBy: parts[3] || ''
+                });
+            }
+        }
+    }
+
+    let petugasList = petugasRaw ? petugasRaw.split(';').map(p => p.trim()).filter(Boolean) : [''];
+    if (petugasList.length === 0) petugasList = [''];
+    S.petugas = petugasList;
+    if (tujuanVal) S.tujuan = tujuanVal;
+    if (tanggalAwalVal) S.tanggalAwal = tanggalAwalVal;
+    if (tanggalAkhirVal) S.tanggalAkhir = tanggalAkhirVal;
+    if (perihalVal) S.perihal = perihalVal;
+    if (nomorSuratVal) S.nomorSurat = nomorSuratVal;
+    if (kampungList.length > 0) S.kampung = kampungList;
+    if (wilayahList.length > 0) S.wilayah = wilayahList;
+    if (Object.keys(progressData).length > 0) S.p = progressData;
+    if (Object.keys(photoData).length > 0) S.photos = photoData;
+    if (wordBackupData.length > 0) S.wordBackupUrl = wordBackupData;
+}
+
+// ===== EXPORT EXCEL =====
+function exportExcel(){
+    try {
+        let wb = XLSX.utils.book_new();
+        let utamaData = [["Nama Petugas","Tujuan","Tanggal Awal","Tanggal Akhir","Perihal","Nomor Surat Tugas"]]; utamaData.push([S.petugas.filter(p=>p.trim()).join('; '),S.tujuan||'',S.tanggalAwal||'',S.tanggalAkhir||'',S.perihal||'',S.nomorSurat||'']);
+        let wsUtama = XLSX.utils.aoa_to_sheet(utamaData); XLSX.utils.book_append_sheet(wb, wsUtama, "DATA UTAMA");
+        let kampungData = [["Kampung","Distrik","Mengetahui","Jabatan"]]; S.kampung.forEach(k=>{ kampungData.push([k.kampung||'',k.distrik||'',k.mengetahui||'',k.jabatan||'']); });
+        let wsKampung = XLSX.utils.aoa_to_sheet(kampungData); XLSX.utils.book_append_sheet(wb, wsKampung, "KAMPUNG TUJUAN");
+        let wilayahData = [["Kampung","SLS","Nama PPL","Tanggal Awal","Tanggal Akhir","AssignmentTotal","BKUTotal","KeluargaTotal","BangunanTotal","UsahaTotal"]]; S.wilayah.forEach(w=>{ wilayahData.push([w.kampung||'',w.sls||'',w.ppl||'',w.start||'',w.end||'',w.assignmentTotal||0,w.bkuTotal||0,w.keluargaTotal||0,w.bangunanTotal||0,w.usahaTotal||0]); });
+        let wsWilayah = XLSX.utils.aoa_to_sheet(wilayahData); XLSX.utils.book_append_sheet(wb, wsWilayah, "WILAYAH TUGAS");
+        let progresData = [["Kampung","Tanggal","SLS","PPL","Assignment","BKU","Keluarga","Bangunan Lainnya","Usaha","Catatan SLS"]]; let vs = group(); vs.forEach(v=>{ let ds=Object.keys(S.p[v.name]||{}).sort(); ds.forEach(d=>{ Object.values(S.p[v.name][d].items).forEach(x=>{ progresData.push([v.name,d,x.sls,x.ppl,x.assignment||'0',x.bku||'0',x.keluarga||'0',x.bangunan||'0',x.usaha||'0',x.notes||'']); }); }); });
+        let wsProgres = XLSX.utils.aoa_to_sheet(progresData); XLSX.utils.book_append_sheet(wb, wsProgres, "DATA PROGRES");
+        let dokumenData = [["Kampung","Cloudinary_URL_Gambar","Caption"]]; vs.forEach(v=>{ let photos=S.photos[v.name]||[]; photos.forEach(p=>{ if(p.src) dokumenData.push([v.name,p.src,p.caption||'']); }); }); let perahuPhotos=S.photos["Perahu"]||[]; perahuPhotos.forEach(p=>{ if(p.src) dokumenData.push(["Perahu",p.src,p.caption||'']); });
+        let wsDokumen = XLSX.utils.aoa_to_sheet(dokumenData); XLSX.utils.book_append_sheet(wb, wsDokumen, "DOKUMENTASI");
+        let backupWordData = [["Nama_File","Cloudinary_Word_URL","Tanggal_Dibuat","Dibuat_oleh"]]; if(S.wordBackupUrl&&S.wordBackupUrl.length>0){ S.wordBackupUrl.forEach(w=>{ backupWordData.push([w.name||'',w.file||'',w.date||'',w.createdBy||'']); }); } else { backupWordData.push(["Belum ada backup","","",""]); }
+        let wsBackup = XLSX.utils.aoa_to_sheet(backupWordData); XLSX.utils.book_append_sheet(wb, wsBackup, "BACKUP WORD");
+        let wbout = XLSX.write(wb,{bookType:'xlsx',type:'array'}); let blob=new Blob([wbout],{type:'application/octet-stream'}); let link=document.createElement('a'); link.href=URL.createObjectURL(blob);
+        let pplNames=S.petugas.filter(p=>p.trim()); let ppl1=pplNames.length>0?pplNames[0]:"TanpaNama"; let now=new Date(); let tgl=now.toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"}).replace(/\s/g,"_"); let jam=now.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit",hour12:false}).replace(/:/g,"."); link.download=`Laporan SE Tim ${ppl1} - ${tgl} - ${jam} WIT.xlsx`;
+        link.click(); URL.revokeObjectURL(link.href); $("status").innerHTML='<div class="status">✅ Backup data lengkap berhasil diexport ke Excel (.xlsx).</div>';
+    } catch (err) {
+        console.error("Error saat Backup Excel:", err);
+        alert("Terjadi error saat Backup Excel. Pastikan library SheetJS termuat atau cek konsol browser (F12).");
+    }
+}
+
+// ===== IMPORT EXCEL (Mendukung Excel dan CSV lama) =====
 function importExcel(event){
-    let file=event.target.files[0]; if(!file){alert('Pilih file Backup (.xlsx atau .csv) terlebih dahulu.');return;}
-    let reader=new FileReader(); reader.onload=function(e){ try{ let data=new Uint8Array(e.target.result); let workbook=XLSX.read(data,{type:'array'});
-        function getSheetData(sheetName){ let sheet=workbook.Sheets[sheetName]; if(!sheet) return []; return XLSX.utils.sheet_to_json(sheet); }
-        function parseExcelDate(val){ if(typeof val==='number'){ let d=new Date((val-25569)*86400*1000); let day=String(d.getDate()).padStart(2,'0'); let month=String(d.getMonth()+1).padStart(2,'0'); let year=d.getFullYear(); return `${day}/${month}/${year}`; } return String(val||''); }
-        let utama=getSheetData('DATA UTAMA'); if(utama.length>0){ let row=utama[0]; let petugasRaw=row['Nama Petugas']||''; S.petugas=petugasRaw?petugasRaw.split(';').map(p=>p.trim()).filter(Boolean):['']; if(S.petugas.length===0) S.petugas=['']; S.tujuan=row['Tujuan']||''; S.tanggalAwal=parseExcelDate(row['Tanggal Awal']); S.tanggalAkhir=parseExcelDate(row['Tanggal Akhir']); S.perihal=row['Perihal']||"Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026"; S.nomorSurat=row['Nomor Surat Tugas']||''; }
-        let kampungData=getSheetData('KAMPUNG TUJUAN'); S.kampung=kampungData.map(k=>({kampung:k['Kampung']||'',distrik:k['Distrik']||'',mengetahui:k['Mengetahui']||'',jabatan:k['Jabatan']||''}));
-        let wilayahData=getSheetData('WILAYAH TUGAS'); S.wilayah=wilayahData.map(w=>({kampung:w['Kampung']||'',sls:w['SLS']||'',ppl:w['Nama PPL']||'',start:parseExcelDate(w['Tanggal Awal']),end:parseExcelDate(w['Tanggal Akhir']),assignmentTotal:parseInt(w['AssignmentTotal'])||0,bkuTotal:parseInt(w['BKUTotal'])||0,keluargaTotal:parseInt(w['KeluargaTotal'])||0,bangunanTotal:parseInt(w['BangunanTotal'])||0,usahaTotal:parseInt(w['UsahaTotal'])||0}));
-        let progresData=getSheetData('DATA PROGRES'); S.p={}; progresData.forEach(row=>{ let kampung=row['Kampung']||''; let tanggal=parseExcelDate(row['Tanggal']); let sls=row['SLS']||''; let ppl=row['PPL']||''; if(!kampung||!tanggal) return; if(!S.p[kampung]) S.p[kampung]={}; if(!S.p[kampung][tanggal]) S.p[kampung][tanggal]={notes:"", items:{}}; let key=sls+'||'+ppl; S.p[kampung][tanggal].items[key]={sls:sls,ppl:ppl,assignment:String(row['Assignment']||'0'),bku:String(row['BKU']||'0'),keluarga:String(row['Keluarga']||'0'),bangunan:String(row['Bangunan Lainnya']||'0'),usaha:String(row['Usaha']||'0'),notes:row['Catatan SLS']||''}; });
-        let dokumenData=getSheetData('DOKUMENTASI'); S.photos={}; dokumenData.forEach(row=>{ let kampung=row['Kampung']||''; let src=row['Cloudinary_URL_Gambar']||''; let caption=row['Caption']||''; if(kampung&&src){ if(!S.photos[kampung]) S.photos[kampung]=[]; S.photos[kampung].push({src:src,caption:caption}); } });
-        let backupWordData=getSheetData('BACKUP WORD'); S.wordBackupUrl=backupWordData.map(w=>({name:w['Nama_File']||'',file:w['Cloudinary_Word_URL']||'',date:w['Tanggal_Dibuat']||'',createdBy:w['Dibuat_oleh']||''}));
-        renderPetugas(); document.getElementById('tujuan').value=S.tujuan||""; if(S.tanggalAwal){ let parts=S.tanggalAwal.split('/'); if(parts.length===3){ document.getElementById('tanggalAwal').value=`${parts[0]}/${parts[1]}/${parts[2]}`; } } if(S.tanggalAkhir){ let parts=S.tanggalAkhir.split('/'); if(parts.length===3){ document.getElementById('tanggalAkhir').value=`${parts[0]}/${parts[1]}/${parts[2]}`; } } document.getElementById('perihal').value=S.perihal||"Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026"; document.getElementById('nomorSurat').value=S.nomorSurat||""; renderKampung(); renderWilayah(); if(Object.keys(S.p).length>0){$("progress").classList.remove("hidden");renderProgress();} renderDokumentasi();
-        let totalPhotos=Object.values(S.photos).reduce((acc,arr)=>acc+arr.length,0); $("status").innerHTML=`<div class="status">✅ Berhasil restore data dari Excel!<br>👤 Petugas: ${S.petugas.length} orang<br>🏠 Kampung: ${S.kampung.length}<br>📋 Wilayah: ${S.wilayah.length}<br>📸 Dokumentasi: ${totalPhotos} gambar</div>`; save();
-    } catch(err){alert('Error saat membaca Excel: '+err.message);console.error(err);} }; reader.readAsArrayBuffer(file); event.target.value='';
+    let file = event.target.files[0];
+    if (!file) { alert('Pilih file Backup (.xlsx atau .csv) terlebih dahulu.'); return; }
+    let reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            // Deteksi apakah file CSV (berdasarkan ekstensi atau awal konten)
+            let isCSV = file.name.toLowerCase().endsWith('.csv');
+            if (!isCSV) {
+                // Coba deteksi dari konten: jika mengandung "=== DATA UTAMA ==="
+                let textSample = e.target.result.slice(0, 200);
+                if (textSample.includes('=== DATA UTAMA ===')) {
+                    isCSV = true;
+                }
+            }
+            if (isCSV) {
+                // Gunakan parser CSV lama
+                let text = e.target.result;
+                importLegacyCSV(text);
+                // Render ulang UI
+                renderPetugas();
+                document.getElementById('tujuan').value = S.tujuan || "";
+                if (S.tanggalAwal) {
+                    let parts = S.tanggalAwal.split('-');
+                    if (parts.length === 3) {
+                        document.getElementById('tanggalAwal').value = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                    }
+                }
+                if (S.tanggalAkhir) {
+                    let parts = S.tanggalAkhir.split('-');
+                    if (parts.length === 3) {
+                        document.getElementById('tanggalAkhir').value = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                    }
+                }
+                document.getElementById('perihal').value = S.perihal || "Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026";
+                document.getElementById('nomorSurat').value = S.nomorSurat || "";
+                renderKampung();
+                renderWilayah();
+                if (Object.keys(S.p).length > 0) { $("progress").classList.remove("hidden"); renderProgress(); }
+                renderDokumentasi();
+                let totalPhotos = Object.values(S.photos).reduce((acc, arr) => acc + arr.length, 0);
+                $("status").innerHTML = `<div class="status">✅ Berhasil restore data dari CSV lama!<br>👤 Petugas: ${S.petugas.length} orang<br>🏠 Kampung: ${S.kampung.length}<br>📋 Wilayah: ${S.wilayah.length}<br>📸 Dokumentasi: ${totalPhotos} gambar</div>`;
+                save();
+                return;
+            }
+
+            // Jika bukan CSV, proses sebagai Excel
+            let data = new Uint8Array(e.target.result);
+            let workbook = XLSX.read(data, { type: 'array' });
+            function getSheetData(sheetName) {
+                let sheet = workbook.Sheets[sheetName];
+                if (!sheet) return [];
+                return XLSX.utils.sheet_to_json(sheet);
+            }
+            function parseExcelDate(val) {
+                if (typeof val === 'number') {
+                    let d = new Date((val - 25569) * 86400 * 1000);
+                    let day = String(d.getDate()).padStart(2, '0');
+                    let month = String(d.getMonth() + 1).padStart(2, '0');
+                    let year = d.getFullYear();
+                    return `${day}/${month}/${year}`;
+                }
+                return String(val || '');
+            }
+            let utama = getSheetData('DATA UTAMA');
+            if (utama.length > 0) {
+                let row = utama[0];
+                let petugasRaw = row['Nama Petugas'] || '';
+                S.petugas = petugasRaw ? petugasRaw.split(';').map(p => p.trim()).filter(Boolean) : [''];
+                if (S.petugas.length === 0) S.petugas = [''];
+                S.tujuan = row['Tujuan'] || '';
+                S.tanggalAwal = parseExcelDate(row['Tanggal Awal']);
+                S.tanggalAkhir = parseExcelDate(row['Tanggal Akhir']);
+                S.perihal = row['Perihal'] || "Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026";
+                S.nomorSurat = row['Nomor Surat Tugas'] || '';
+            }
+            let kampungData = getSheetData('KAMPUNG TUJUAN');
+            S.kampung = kampungData.map(k => ({ kampung: k['Kampung'] || '', distrik: k['Distrik'] || '', mengetahui: k['Mengetahui'] || '', jabatan: k['Jabatan'] || '' }));
+            let wilayahData = getSheetData('WILAYAH TUGAS');
+            S.wilayah = wilayahData.map(w => ({ kampung: w['Kampung'] || '', sls: w['SLS'] || '', ppl: w['Nama PPL'] || '', start: parseExcelDate(w['Tanggal Awal']), end: parseExcelDate(w['Tanggal Akhir']), assignmentTotal: parseInt(w['AssignmentTotal']) || 0, bkuTotal: parseInt(w['BKUTotal']) || 0, keluargaTotal: parseInt(w['KeluargaTotal']) || 0, bangunanTotal: parseInt(w['BangunanTotal']) || 0, usahaTotal: parseInt(w['UsahaTotal']) || 0 }));
+            let progresData = getSheetData('DATA PROGRES');
+            S.p = {};
+            progresData.forEach(row => {
+                let kampung = row['Kampung'] || '';
+                let tanggal = parseExcelDate(row['Tanggal']);
+                let sls = row['SLS'] || '';
+                let ppl = row['PPL'] || '';
+                if (!kampung || !tanggal) return;
+                if (!S.p[kampung]) S.p[kampung] = {};
+                if (!S.p[kampung][tanggal]) S.p[kampung][tanggal] = { notes: "", items: {} };
+                let key = sls + '||' + ppl;
+                S.p[kampung][tanggal].items[key] = { sls: sls, ppl: ppl, assignment: String(row['Assignment'] || '0'), bku: String(row['BKU'] || '0'), keluarga: String(row['Keluarga'] || '0'), bangunan: String(row['Bangunan Lainnya'] || '0'), usaha: String(row['Usaha'] || '0'), notes: row['Catatan SLS'] || '' };
+            });
+            let dokumenData = getSheetData('DOKUMENTASI');
+            S.photos = {};
+            dokumenData.forEach(row => {
+                let kampung = row['Kampung'] || '';
+                let src = row['Cloudinary_URL_Gambar'] || '';
+                let caption = row['Caption'] || '';
+                if (kampung && src) {
+                    if (!S.photos[kampung]) S.photos[kampung] = [];
+                    S.photos[kampung].push({ src: src, caption: caption });
+                }
+            });
+            let backupWordData = getSheetData('BACKUP WORD');
+            S.wordBackupUrl = backupWordData.map(w => ({ name: w['Nama_File'] || '', file: w['Cloudinary_Word_URL'] || '', date: w['Tanggal_Dibuat'] || '', createdBy: w['Dibuat_oleh'] || '' }));
+            renderPetugas();
+            document.getElementById('tujuan').value = S.tujuan || "";
+            if (S.tanggalAwal) {
+                let parts = S.tanggalAwal.split('/');
+                if (parts.length === 3) {
+                    document.getElementById('tanggalAwal').value = `${parts[0]}/${parts[1]}/${parts[2]}`;
+                }
+            }
+            if (S.tanggalAkhir) {
+                let parts = S.tanggalAkhir.split('/');
+                if (parts.length === 3) {
+                    document.getElementById('tanggalAkhir').value = `${parts[0]}/${parts[1]}/${parts[2]}`;
+                }
+            }
+            document.getElementById('perihal').value = S.perihal || "Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026";
+            document.getElementById('nomorSurat').value = S.nomorSurat || "";
+            renderKampung();
+            renderWilayah();
+            if (Object.keys(S.p).length > 0) { $("progress").classList.remove("hidden"); renderProgress(); }
+            renderDokumentasi();
+            let totalPhotos = Object.values(S.photos).reduce((acc, arr) => acc + arr.length, 0);
+            $("status").innerHTML = `<div class="status">✅ Berhasil restore data dari Excel!<br>👤 Petugas: ${S.petugas.length} orang<br>🏠 Kampung: ${S.kampung.length}<br>📋 Wilayah: ${S.wilayah.length}<br>📸 Dokumentasi: ${totalPhotos} gambar</div>`;
+            save();
+        } catch (err) {
+            alert('Error saat membaca file: ' + err.message);
+            console.error(err);
+        }
+    };
+    if (file.name.toLowerCase().endsWith('.csv')) {
+        reader.readAsText(file);
+    } else {
+        reader.readAsArrayBuffer(file);
+    }
+    event.target.value = '';
 }
 
 // ===== INISIALISASI =====
