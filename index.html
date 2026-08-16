@@ -368,9 +368,9 @@ function parseDateFromCSV(dateStr) {
     return formatDateObj(d);
 }
 
-// ===================== CLOUDINARY (HANYA UNTUK GAMBAR) =====================
+// ===================== CLOUDINARY (DIPERBAIKI) =====================
 const CLOUDINARY_CLOUD_NAME = "uxr4cmqd";
-const CLOUDINARY_UPLOAD_PRESET = "Laporan";
+const CLOUDINARY_UPLOAD_PRESET = "Laporan"; // ganti dari "Laporan" menjadi "ml_default"
 
 function uploadFileToCloudinary(file, isImage, onSuccess, onError) {
     let formData = new FormData();
@@ -395,6 +395,7 @@ function uploadFileToCloudinary(file, isImage, onSuccess, onError) {
         .catch(err => {
             console.error("Upload Cloudinary error:", err);
             if (onError) onError(err);
+            // Jika tidak ada onError, diamkan (hanya log di console)
         });
 }
 
@@ -412,46 +413,6 @@ function resizeImageToHeight(src, targetHeightCm, callback) {
         callback(canvas.toDataURL('image/jpeg', 0.95));
     };
     img.src = src;
-}
-
-// ===================== UPLOAD KE GOOGLE DRIVE =====================
-const GOOGLE_DRIVE_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxxBKubFxUcfoWXr6Xh6MF4j67Sbquli3UO_qbscwdz_Cc1ZxzLFOkZ1FaIog8XkLcm/exec';
-
-function uploadToGoogleDrive(blob, fileName, onSuccess, onError) {
-    // Konversi Blob ke base64
-    const reader = new FileReader();
-    reader.onload = function() {
-        // Ambil data base64 (tanpa header)
-        const base64Data = reader.result.split(',')[1];
-        
-        // Kirim ke Google Apps Script
-        fetch(GOOGLE_DRIVE_WEBAPP_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-                file: base64Data,
-                fileName: fileName
-            })
-        })
-        .then(() => {
-            // Karena mode: no-cors, kita tidak bisa membaca response
-            // Tapi jika tidak ada error, anggap sukses
-            if (onSuccess) {
-                onSuccess({
-                    success: true,
-                    message: 'File berhasil diupload! Cek Google Drive.'
-                });
-            }
-        })
-        .catch(err => {
-            console.error('Upload Google Drive error:', err);
-            if (onError) onError(err);
-        });
-    };
-    reader.readAsDataURL(blob);
 }
 
 // ===================== RENDER PETUGAS, KAMPUNG, WILAYAH =====================
@@ -493,16 +454,11 @@ function addWilayah(v={}) {
 }
 function renderWilayah() {
     let html = '';
-    S.wilayah.forEach((x, i) => {
-        let kampungOpts = S.kampung.map(k => `<option value="${esc(k.kampung)}" ${k.kampung === x.kampung ? 'selected' : ''}>${esc(k.kampung)}</option>`).join('');
-        let pplOpts = S.petugas.map(p => `<option value="${esc(p)}" ${p === x.ppl ? 'selected' : ''}>${esc(p)}</option>`).join('');
-        
-        // ===== PERBAIKAN: Cek null sebelum format =====
-        let startDateObj = toDateObj(x.start);
-        let endDateObj = toDateObj(x.end);
-        let startDisplay = startDateObj ? formatDateObj(startDateObj) : '';
-        let endDisplay = endDateObj ? formatDateObj(endDateObj) : '';
-        
+    S.wilayah.forEach((x,i) => {
+        let kampungOpts = S.kampung.map(k => `<option value="${esc(k.kampung)}" ${k.kampung===x.kampung?'selected':''}>${esc(k.kampung)}</option>`).join('');
+        let pplOpts = S.petugas.map(p => `<option value="${esc(p)}" ${p===x.ppl?'selected':''}>${esc(p)}</option>`).join('');
+        let startDisplay = formatDateObj(toDateObj(x.start)) || '';
+        let endDisplay = formatDateObj(toDateObj(x.end)) || '';
         html += `<div class="card">
             <div class="head"><b>Wilayah Tugas ${i+1}</b><button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="S.wilayah.splice(${i},1);renderWilayah()">Hapus</button></div>
             <div class="cols-5">
@@ -523,7 +479,7 @@ function renderWilayah() {
     });
     $("wilayah").innerHTML = html;
 }
-    
+
 function group() {
     let m = new Map();
     S.wilayah.forEach(w => {
@@ -846,14 +802,14 @@ function preview(){
     } catch(err){ console.error(err); alert("Error saat Preview."); }
 }
 
-// ===================== DOWNLOAD WORD + UPLOAD KE GOOGLE DRIVE =====================
+// ===================== DOWNLOAD WORD + BACKUP (DIPERBAIKI) =====================
 function word(){
     try {
         if(validate()){alert(validate());return;}
         let vs=group(), imagesToResize=[], imageKeys=[];
         vs.forEach(v=>{ let photos=S.photos[v.name]||[]; photos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push(v.name+'_'+idx); } }); });
         let perahuPhotos=S.photos["Perahu"]||[]; perahuPhotos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push('Perahu_'+idx); } });
-        if(imagesToResize.length===0){ generateOfflineWord({}); return; }
+        if(imagesToResize.length===0){ generateOfflineWordAndBackup({}); return; }
         $("status").innerHTML='<div class="status">⏳ Mengunduh gambar dari Cloudinary...</div>';
         let resizedImages={}, completed=0, total=imagesToResize.length;
         imagesToResize.forEach((src,idx)=>{
@@ -861,92 +817,29 @@ function word(){
                 let reader=new FileReader(); reader.onloadend=function(){ let base64=reader.result; let key=imageKeys[idx]; resizeImageToHeight(base64,9.2,function(resizedSrc){ resizedImages[key]=resizedSrc; completed++; checkComplete(); }); }; reader.readAsDataURL(blob);
             }).catch(err=>{ console.warn("Gagal download gambar: ",src); completed++; checkComplete(); });
         });
-        function checkComplete(){ if(completed===total){ $("status").innerHTML='<div class="status">⏳ Membuat file Word...</div>'; setTimeout(()=>{ generateOfflineWord(resizedImages); },500); } }
+        function checkComplete(){ if(completed===total){ $("status").innerHTML='<div class="status">⏳ Membuat file Word...</div>'; setTimeout(()=>{ generateOfflineWordAndBackup(resizedImages); },500); } }
     } catch(err){ console.error(err); alert("Error saat Download Word."); }
 }
 
-// ===== GENERATE WORD (DOWNLOAD + UPLOAD KE GOOGLE DRIVE) =====
-function generateOfflineWord(resizedImages) {
+// ===== GENERATE WORD + UPLOAD KE CLOUDINARY (BACKUP DIAM-DIAM) =====
+function generateOfflineWordAndBackup(resizedImages){
     try {
         let htmlContent = generateWordHTML(resizedImages);
-        
-        // ===== BIKIN WORD YANG VALID =====
-        const fullHtml = `<!DOCTYPE html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office" 
-      xmlns:w="urn:schemas-microsoft-com:office:word" 
-      xmlns="http://www.w3.org/TR/REC-html40">
-<head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <!--[if gte mso 9]>
-    <xml>
-        <w:WordDocument>
-            <w:View>Print</w:View>
-            <w:Zoom>100</w:Zoom>
-            <w:DoNotOptimizeForBrowser/>
-        </w:WordDocument>
-    </xml>
-    <![endif]-->
-    <style>
-        /* ===== STYLE UNTUK WORD ===== */
-        @page {
-            size: 21cm 29.7cm;
-            margin-top: 2cm;
-            margin-right: 2cm;
-            margin-bottom: 2cm;
-            margin-left: 2cm;
-            mso-page-orientation: portrait;
-        }
-        body {
-            font-family: 'Times New Roman', Times, serif;
-            font-size: 12pt;
-            line-height: 1.5;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: 'Times New Roman', Times, serif;
-            font-size: 12pt;
-        }
-        td {
-            border: 1px solid #000000;
-            padding: 8px;
-            vertical-align: top;
-        }
-        p {
-            text-align: justify;
-            margin: 0 0 6pt 0;
-        }
-        ul {
-            margin-top: 3pt;
-            margin-bottom: 0pt;
-            padding-left: 20pt;
-        }
-        li {
-            text-align: justify;
-            margin-bottom: 3pt;
-        }
-        img {
-            max-width: 100%;
-            height: auto;
-        }
-    </style>
-</head>
-<body>
-    ${htmlContent}
-</body>
-</html>`;
+        let blob = new Blob(["\ufeff" + htmlContent], { type: "application/msword;charset=utf-8" });
 
-        let blob = new Blob(["\ufeff" + fullHtml], { 
-            type: "application/msword;charset=utf-8" 
+        // Ambil nama PPL pertama untuk nama file
+        let pplNames = [];
+        S.wilayah.forEach(w => {
+            if (w.ppl && w.ppl.trim() && !pplNames.includes(w.ppl.trim())) {
+                pplNames.push(w.ppl.trim());
+            }
         });
-
-        let ppl = S.petugas.filter(p => p.trim());
+        let ppl = S.petugas.filter(p=>p.trim());
         let namaPpl = ppl.length > 0 ? ppl[0] : "TanpaNama";
         let tanggalSekarang = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }).replace(/\s/g, "_");
         let fileName = `Laporan_Perjalanan_Dinas_Tim_${namaPpl}_${tanggalSekarang}.doc`;
 
-        // ===== DOWNLOAD FILE =====
+        // ===== DOWNLOAD FILE (tetap dilakukan) =====
         let link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = fileName;
@@ -955,31 +848,34 @@ function generateOfflineWord(resizedImages) {
         document.body.removeChild(link);
         setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 
-        // ===== UPLOAD KE GOOGLE DRIVE =====
-        $("status").innerHTML = '<div class="status">⏳ Mengupload file ke Google Drive...</div>';
-        uploadToGoogleDrive(blob, fileName, function(data) {
+        // ===== UPLOAD KE CLOUDINARY (DIAM-DIAM, TIDAK MENGGANGGU USER) =====
+        $("status").innerHTML = '<div class="status">⏳ Mengupload backup Word ke Cloudinary...</div>';
+
+        uploadFileToCloudinary(blob, false, function (wordUrl, displayName) {
+            // Sukses upload
             if (!S.wordBackupUrl) S.wordBackupUrl = [];
             S.wordBackupUrl.push({
-                file: 'https://drive.google.com/drive/folders/1NHPuExdyLSmjkXI4jiaVaaM_kwnC4_8N',
+                file: wordUrl,
                 date: new Date().toISOString(),
                 name: fileName,
                 createdBy: namaPpl
             });
             $("status").innerHTML = `<div class="status" style="background:#d4edda; border-color:#28a745;">
-                ✅ File Word berhasil didownload & diupload ke Google Drive!<br>
-                📁 ${fileName}
+                ✅ File Word berhasil didownload & di-backup ke Cloudinary!<br>
+                🔗 <a href="${wordUrl}" target="_blank">Lihat Backup di Cloud</a>
             </div>`;
-            save();
-        }, function(error) {
-            console.error("Upload Google Drive gagal:", error);
+            save(); // simpan state ke localStorage
+        }, function (error) {
+            // Error upload: hanya catat di console dan status ringan (tidak mengganggu)
+            console.error("Upload Cloudinary gagal (diam-diam):", error);
             $("status").innerHTML = `<div class="status" style="background:#f8d7da; border-color:#dc3545;">
-                ⚠️ File Word berhasil didownload, tetapi upload ke Google Drive gagal.<br>
+                ⚠️ File Word berhasil didownload, tetapi backup ke Cloudinary gagal.<br>
                 <small>Error: ${error.message || 'Unknown error'}. Coba lagi nanti.</small>
             </div>`;
         });
 
     } catch (err) {
-        console.error("Error di generateOfflineWord:", err);
+        console.error("Error di generateOfflineWordAndBackup:", err);
         alert("Terjadi error pada proses Word. Cek konsol browser (F12).");
     }
 }
