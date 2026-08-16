@@ -579,7 +579,7 @@ function validate() {
     return "";
 }
 
-// ===== GENERATE =====
+// ===== GENERATE (DIPERBAIKI - ALOKASI SISA) =====
 function generate() {
     let e = validate();
     if (e) { $("status").innerHTML = `<div class="status err">${esc(e)}</div>`; return; }
@@ -609,20 +609,40 @@ function generate() {
                 let k = w.sls + "||" + w.ppl;
                 let days = dates(w.start, w.end).length;
                 if (days === 0) days = 1;
-                let assignVal = 0, bkuVal = 0, keluargaVal = 0, bangunanVal = 0, usahaVal = 0;
+
+                // Hitung dasar dan sisa untuk setiap metrik
+                let totalAssign = w.assignmentTotal || 0;
+                let totalBku = w.bkuTotal || 0;
+                let totalKeluarga = w.keluargaTotal || 0;
+                let totalBangunan = w.bangunanTotal || 0;
+                let totalUsaha = w.usahaTotal || 0;
+
+                let baseAssign = Math.floor(totalAssign / days);
+                let remAssign = totalAssign % days;
+                let baseBku = Math.floor(totalBku / days);
+                let remBku = totalBku % days;
+                let baseKeluarga = Math.floor(totalKeluarga / days);
+                let remKeluarga = totalKeluarga % days;
+                let baseBangunan = Math.floor(totalBangunan / days);
+                let remBangunan = totalBangunan % days;
+                let baseUsaha = Math.floor(totalUsaha / days);
+                let remUsaha = totalUsaha % days;
+
+                let assignVal = baseAssign;
+                let bkuVal = baseBku;
+                let keluargaVal = baseKeluarga;
+                let bangunanVal = baseBangunan;
+                let usahaVal = baseUsaha;
+
+                // Tambahkan sisa ke hari terakhir
                 if (d === allDates[allDates.length - 1]) {
-                    assignVal = Math.floor((w.assignmentTotal || 0) / days * 0.1);
-                    bkuVal = Math.floor((w.bkuTotal || 0) / days * 0.1);
-                    keluargaVal = Math.floor((w.keluargaTotal || 0) / days * 0.1);
-                    bangunanVal = Math.floor((w.bangunanTotal || 0) / days * 0.1);
-                    usahaVal = Math.floor((w.usahaTotal || 0) / days * 0.1);
-                } else {
-                    assignVal = Math.round((w.assignmentTotal || 0) / days);
-                    bkuVal = Math.round((w.bkuTotal || 0) / days);
-                    keluargaVal = Math.round((w.keluargaTotal || 0) / days);
-                    bangunanVal = Math.round((w.bangunanTotal || 0) / days);
-                    usahaVal = Math.round((w.usahaTotal || 0) / days);
+                    assignVal += remAssign;
+                    bkuVal += remBku;
+                    keluargaVal += remKeluarga;
+                    bangunanVal += remBangunan;
+                    usahaVal += remUsaha;
                 }
+
                 S.p[v.name][d].items[k] = {
                     sls: w.sls, ppl: w.ppl,
                     assignment: assignVal,
@@ -1293,7 +1313,7 @@ function fallbackExportCSV() {
 }
 
 // ============================================================
-// ===== IMPORT EXCEL (DIPERBAIKI - FLEKSIBEL NAMA SHEET) =====
+// ===== IMPORT EXCEL (FLEKSIBEL) =====
 // ============================================================
 
 function importExcel(event){
@@ -1399,27 +1419,51 @@ function importExcel(event){
                 usahaTotal: parseInt(w['UsahaTotal']) || 0
             }));
 
-            // PROGRES (jika ada)
+            // PROGRES
             let progresData = getSheetDataByKeyword('PROGRES');
             S.p = {};
             progresData.forEach(row => {
-                let kampung = row['Kampung'] || '';
-                let tanggal = parseExcelDate(row['Tanggal']);
-                let sls = row['SLS'] || '';
-                let ppl = row['PPL'] || '';
-                if (!kampung || !tanggal) return;
+                let kampung = '';
+                let tanggal = '';
+                let sls = '';
+                let ppl = '';
+                let assignment = '0';
+                let bku = '0';
+                let keluarga = '0';
+                let bangunan = '0';
+                let usaha = '0';
+                let catatan = '';
+
+                Object.keys(row).forEach(key => {
+                    let lowerKey = key.trim().toLowerCase();
+                    let val = row[key];
+                    if (lowerKey === 'kampung') kampung = String(val || '').trim();
+                    else if (lowerKey === 'tanggal') tanggal = String(val || '').trim();
+                    else if (lowerKey === 'sls') sls = String(val || '').trim();
+                    else if (lowerKey === 'ppl') ppl = String(val || '').trim();
+                    else if (lowerKey === 'assignment') assignment = String(val || '0');
+                    else if (lowerKey === 'bku') bku = String(val || '0');
+                    else if (lowerKey === 'keluarga') keluarga = String(val || '0');
+                    else if (lowerKey === 'bangunan lainnya' || lowerKey === 'bangunan') bangunan = String(val || '0');
+                    else if (lowerKey === 'usaha') usaha = String(val || '0');
+                    else if (lowerKey === 'catatan' || lowerKey === 'catatan sls') catatan = String(val || '');
+                });
+
+                let parsedTanggal = parseExcelDate(tanggal);
+                if (!kampung || !parsedTanggal) return;
+
                 if (!S.p[kampung]) S.p[kampung] = {};
-                if (!S.p[kampung][tanggal]) S.p[kampung][tanggal] = { notes: "", items: {} };
+                if (!S.p[kampung][parsedTanggal]) S.p[kampung][parsedTanggal] = { notes: "", items: {} };
                 let key = sls + '||' + ppl;
-                S.p[kampung][tanggal].items[key] = {
+                S.p[kampung][parsedTanggal].items[key] = {
                     sls: sls,
                     ppl: ppl,
-                    assignment: String(row['Assignment'] || '0'),
-                    bku: String(row['BKU'] || '0'),
-                    keluarga: String(row['Keluarga'] || '0'),
-                    bangunan: String(row['Bangunan Lainnya'] || '0'),
-                    usaha: String(row['Usaha'] || '0'),
-                    notes: row['Catatan SLS'] || ''
+                    assignment: assignment,
+                    bku: bku,
+                    keluarga: keluarga,
+                    bangunan: bangunan,
+                    usaha: usaha,
+                    notes: catatan
                 };
             });
 
@@ -1456,7 +1500,6 @@ function importExcel(event){
     event.target.value = '';
 }
 
-// Fungsi pembantu untuk refresh UI setelah import
 function refreshUIAfterImport() {
     renderPetugas();
     document.getElementById('tujuan').value = S.tujuan || "";
