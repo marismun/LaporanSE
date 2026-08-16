@@ -834,14 +834,14 @@ function preview(){
     } catch(err){ console.error(err); alert("Error saat Preview."); }
 }
 
-// ===================== DOWNLOAD WORD + BACKUP (DIPERBAIKI) =====================
+// ===================== DOWNLOAD WORD (TANPA UPLOAD) =====================
 function word(){
     try {
         if(validate()){alert(validate());return;}
         let vs=group(), imagesToResize=[], imageKeys=[];
         vs.forEach(v=>{ let photos=S.photos[v.name]||[]; photos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push(v.name+'_'+idx); } }); });
         let perahuPhotos=S.photos["Perahu"]||[]; perahuPhotos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push('Perahu_'+idx); } });
-        if(imagesToResize.length===0){ generateOfflineWordAndBackup({}); return; }
+        if(imagesToResize.length===0){ generateOfflineWord({}); return; }
         $("status").innerHTML='<div class="status">⏳ Mengunduh gambar dari Cloudinary...</div>';
         let resizedImages={}, completed=0, total=imagesToResize.length;
         imagesToResize.forEach((src,idx)=>{
@@ -849,10 +849,9 @@ function word(){
                 let reader=new FileReader(); reader.onloadend=function(){ let base64=reader.result; let key=imageKeys[idx]; resizeImageToHeight(base64,9.2,function(resizedSrc){ resizedImages[key]=resizedSrc; completed++; checkComplete(); }); }; reader.readAsDataURL(blob);
             }).catch(err=>{ console.warn("Gagal download gambar: ",src); completed++; checkComplete(); });
         });
-        function checkComplete(){ if(completed===total){ $("status").innerHTML='<div class="status">⏳ Membuat file Word...</div>'; setTimeout(()=>{ generateOfflineWordAndBackup(resizedImages); },500); } }
+        function checkComplete(){ if(completed===total){ $("status").innerHTML='<div class="status">⏳ Membuat file Word...</div>'; setTimeout(()=>{ generateOfflineWord(resizedImages); },500); } }
     } catch(err){ console.error(err); alert("Error saat Download Word."); }
 }
-
 function generateOfflineWord(resizedImages) {
     try {
         let htmlContent = generateWordHTML(resizedImages);
