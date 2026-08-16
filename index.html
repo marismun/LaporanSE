@@ -296,7 +296,6 @@ function toDateObj(dateStr) {
     if (!isNaN(date.getTime()) && date.getDate() === d1 && date.getMonth() === m1 && date.getFullYear() === y1) {
         return date;
     }
-    // Coba sebagai mm/dd/yyyy (US)
     let d2 = parseInt(parts[1], 10);
     let m2 = parseInt(parts[0], 10) - 1;
     let y2 = parseInt(parts[2], 10);
@@ -355,39 +354,51 @@ function validateDateFormat(input) {
         setTimeout(() => input.style.borderColor = '', 3000);
     }
 }
-
-// ===== FUNGSI PARSING TANGGAL KHUSUS UNTUK CSV (mm/dd/yyyy) =====
 function parseDateFromCSV(dateStr) {
     if (!dateStr) return '';
     let s = dateStr.trim();
     let parts = s.split('/');
     if (parts.length !== 3) return s;
-    // Asumsi input adalah mm/dd/yyyy
     let month = parseInt(parts[0], 10) - 1;
     let day = parseInt(parts[1], 10);
     let year = parseInt(parts[2], 10);
     if (isNaN(month) || isNaN(day) || isNaN(year)) return s;
     let d = new Date(year, month, day);
     if (isNaN(d.getTime())) return s;
-    return formatDateObj(d); // ubah ke dd/mm/yyyy
+    return formatDateObj(d);
 }
 
-// ===================== CLOUDINARY =====================
+// ===================== CLOUDINARY (DIPERBAIKI) =====================
 const CLOUDINARY_CLOUD_NAME = "uxr4cmqd";
 const CLOUDINARY_UPLOAD_PRESET = "Laporan";
-function uploadFileToCloudinary(file, isImage, callback) {
-    let fd = new FormData();
-    fd.append('file', file);
-    fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-    let endpoint = isImage ? `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload` : `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/raw/upload`;
-    fetch(endpoint, { method:'POST', body:fd })
-        .then(r => r.json())
-        .then(data => {
-            if (data.secure_url) callback(data.secure_url, data.display_name || data.original_filename);
-            else alert("Upload gagal: " + (data.error ? data.error.message : "Error tidak diketahui"));
+
+function uploadFileToCloudinary(file, isImage, onSuccess, onError) {
+    let formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    let endpoint = isImage
+        ? `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`
+        : `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/raw/upload`;
+
+    fetch(endpoint, { method: 'POST', body: formData })
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+            return r.json();
         })
-        .catch(err => { console.error(err); alert("Error koneksi ke Cloudinary: " + err.message); });
+        .then(data => {
+            if (data.secure_url) {
+                if (onSuccess) onSuccess(data.secure_url, data.display_name || data.original_filename);
+            } else {
+                throw new Error(data.error ? data.error.message : "Upload gagal tanpa error detail.");
+            }
+        })
+        .catch(err => {
+            console.error("Upload Cloudinary error:", err);
+            if (onError) onError(err);
+            // Jika tidak ada onError, diamkan (hanya log di console)
+        });
 }
+
 function resizeImageToHeight(src, targetHeightCm, callback) {
     const targetHeightPx = targetHeightCm * 37.795;
     const img = new Image();
@@ -675,11 +686,11 @@ function renderDokumentasiPerahu() {
 }
 function addPhotoPerahu() { S.photos["Perahu"].push({ src:"", caption:"" }); renderDokumentasiPerahu(); }
 function removePhotoPerahu(index) { if (S.photos["Perahu"].length <= 1) { alert('Minimal 1 gambar perahu!'); return; } S.photos["Perahu"].splice(index,1); renderDokumentasiPerahu(); }
-function uploadPhotoPerahu(index,input) { let file = input.files[0]; if (!file) return; $("status").innerHTML = '<div class="status">📤 Upload gambar perahu ke Cloudinary...</div>'; uploadFileToCloudinary(file,true,function(url){ S.photos["Perahu"][index].src = url; renderDokumentasiPerahu(); $("status").innerHTML = '<div class="status">✅ Gambar perahu berhasil diupload!</div>'; }); }
+function uploadPhotoPerahu(index,input) { let file = input.files[0]; if (!file) return; $("status").innerHTML = '<div class="status">📤 Upload gambar perahu ke Cloudinary...</div>'; uploadFileToCloudinary(file,true,function(url){ S.photos["Perahu"][index].src = url; renderDokumentasiPerahu(); $("status").innerHTML = '<div class="status">✅ Gambar perahu berhasil diupload!</div>'; }, function(err){ alert("Gagal upload gambar perahu: "+err.message); }); }
 function updateCaptionPerahu(index,value) { S.photos["Perahu"][index].caption = value; }
 function addPhoto(index) { let vs=group(); let v=vs[index]; if(!S.photos[v.name]) S.photos[v.name]=[]; S.photos[v.name].push({ src:"", caption:"" }); renderDokumentasi(); }
 function removePhoto(index, photoIndex) { let vs=group(); let v=vs[index]; if(S.photos[v.name].length <= 1) { alert('Minimal 1 gambar per kampung!'); return; } S.photos[v.name].splice(photoIndex,1); renderDokumentasi(); }
-function uploadPhoto(index, photoIndex, input) { let file = input.files[0]; if (!file) return; $("status").innerHTML = '<div class="status">📤 Upload gambar ke Cloudinary...</div>'; uploadFileToCloudinary(file,true,function(url){ let vs=group(); let v=vs[index]; S.photos[v.name][photoIndex].src = url; renderDokumentasi(); $("status").innerHTML = '<div class="status">✅ Gambar berhasil diupload!</div>'; }); }
+function uploadPhoto(index, photoIndex, input) { let file = input.files[0]; if (!file) return; $("status").innerHTML = '<div class="status">📤 Upload gambar ke Cloudinary...</div>'; uploadFileToCloudinary(file,true,function(url){ let vs=group(); let v=vs[index]; S.photos[v.name][photoIndex].src = url; renderDokumentasi(); $("status").innerHTML = '<div class="status">✅ Gambar berhasil diupload!</div>'; }, function(err){ alert("Gagal upload gambar: "+err.message); }); }
 function updateCaption(index, photoIndex, value) { let vs=group(); let v=vs[index]; S.photos[v.name][photoIndex].caption = value; }
 
 // ===================== NARRATIVE & WORD =====================
@@ -790,6 +801,8 @@ function preview(){
         setTimeout(()=>{ previewDiv.scrollIntoView({behavior:'smooth',block:'start'}); },100);
     } catch(err){ console.error(err); alert("Error saat Preview."); }
 }
+
+// ===================== DOWNLOAD WORD + BACKUP (DIPERBAIKI) =====================
 function word(){
     try {
         if(validate()){alert(validate());return;}
@@ -807,14 +820,63 @@ function word(){
         function checkComplete(){ if(completed===total){ $("status").innerHTML='<div class="status">⏳ Membuat file Word...</div>'; setTimeout(()=>{ generateOfflineWordAndBackup(resizedImages); },500); } }
     } catch(err){ console.error(err); alert("Error saat Download Word."); }
 }
+
+// ===== GENERATE WORD + UPLOAD KE CLOUDINARY (BACKUP DIAM-DIAM) =====
 function generateOfflineWordAndBackup(resizedImages){
     try {
-        let htmlContent=generateWordHTML(resizedImages); let blob=new Blob(["\ufeff"+htmlContent],{type:"application/msword;charset=utf-8"});
-        let pplNames=[]; S.wilayah.forEach(w=>{ if(w.ppl&&w.ppl.trim()&&!pplNames.includes(w.ppl.trim())) pplNames.push(w.ppl.trim()); }); let namaPpl=pplNames.length>0?pplNames[0]:"TanpaNama"; let tanggalSekarang=new Date().toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"}).replace(/\s/g,"_"); let fileName=`Laporan_Perjalanan_Dinas_Tim_${namaPpl}_${tanggalSekarang}.doc`;
-        let link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download=fileName; document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(()=>URL.revokeObjectURL(link.href),1000);
-        $("status").innerHTML='<div class="status">⏳ Mengupload backup Word ke Cloudinary...</div>';
-        uploadFileToCloudinary(blob,false,function(wordUrl){ if(!S.wordBackupUrl) S.wordBackupUrl=[]; S.wordBackupUrl.push({file:wordUrl,date:new Date().toISOString(),name:fileName,createdBy:namaPpl}); $("status").innerHTML=`<div class="status" style="background:#d4edda;border-color:#28a745;">✅ File Word berhasil didownload & di-backup ke Cloudinary!<br>🔗 <a href="${wordUrl}" target="_blank">Lihat Backup di Cloud</a></div>`; save(); });
-    } catch(err){ console.error(err); alert("Error pada proses Word."); }
+        let htmlContent = generateWordHTML(resizedImages);
+        let blob = new Blob(["\ufeff" + htmlContent], { type: "application/msword;charset=utf-8" });
+
+        // Ambil nama PPL pertama untuk nama file
+        let pplNames = [];
+        S.wilayah.forEach(w => {
+            if (w.ppl && w.ppl.trim() && !pplNames.includes(w.ppl.trim())) {
+                pplNames.push(w.ppl.trim());
+            }
+        });
+        let namaPpl = pplNames.length > 0 ? pplNames[0] : "TanpaNama";
+        let tanggalSekarang = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }).replace(/\s/g, "_");
+        let fileName = `Laporan_Perjalanan_Dinas_Tim_${namaPpl}_${tanggalSekarang}.doc`;
+
+        // ===== DOWNLOAD FILE (tetap dilakukan) =====
+        let link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+
+        // ===== UPLOAD KE CLOUDINARY (DIAM-DIAM, TIDAK MENGGANGGU USER) =====
+        $("status").innerHTML = '<div class="status">⏳ Mengupload backup Word ke Cloudinary...</div>';
+
+        uploadFileToCloudinary(blob, false, function (wordUrl, displayName) {
+            // Sukses upload
+            if (!S.wordBackupUrl) S.wordBackupUrl = [];
+            S.wordBackupUrl.push({
+                file: wordUrl,
+                date: new Date().toISOString(),
+                name: fileName,
+                createdBy: namaPpl
+            });
+            $("status").innerHTML = `<div class="status" style="background:#d4edda; border-color:#28a745;">
+                ✅ File Word berhasil didownload & di-backup ke Cloudinary!<br>
+                🔗 <a href="${wordUrl}" target="_blank">Lihat Backup di Cloud</a>
+            </div>`;
+            save(); // simpan state ke localStorage
+        }, function (error) {
+            // Error upload: hanya catat di console dan status ringan (tidak mengganggu)
+            console.error("Upload Cloudinary gagal (diam-diam):", error);
+            $("status").innerHTML = `<div class="status" style="background:#f8d7da; border-color:#dc3545;">
+                ⚠️ File Word berhasil didownload, tetapi backup ke Cloudinary gagal.<br>
+                <small>Error: ${error.message || 'Unknown error'}. Coba lagi nanti.</small>
+            </div>`;
+        });
+
+    } catch (err) {
+        console.error("Error di generateOfflineWordAndBackup:", err);
+        alert("Terjadi error pada proses Word. Cek konsol browser (F12).");
+    }
 }
 
 // ===================== SAVE, LOAD, RESET =====================
@@ -845,7 +907,7 @@ function load(){
 }
 function resetAll(){ if(confirm("⚠️ Yakin ingin menghapus SEMUA data?")){ localStorage.removeItem("laporanGenerator"); location.reload(); } }
 
-// ===================== LEGACY CSV PARSER (DIPERBAIKI) =====================
+// ===================== LEGACY CSV PARSER =====================
 function parseCSVLine(line) {
     let result=[], current='', inside=false;
     for(let i=0; i<line.length; i++){
@@ -933,7 +995,6 @@ function importLegacyCSV(text) {
             let bangunan = parseInt(parts[idxBangunan]) || 0;
             let usaha = parseInt(parts[idxUsaha]) || 0;
 
-            // Jika start kosong, cari tanggal di posisi lain
             if (!start && idxTglAwal < parts.length-1) {
                 for (let j = idxTglAwal; j < parts.length; j++) {
                     if (parts[j] && parts[j].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
@@ -952,7 +1013,6 @@ function importLegacyCSV(text) {
             }
 
             if (kampung && sls && ppl && start && end) {
-                // Gunakan parseDateFromCSV untuk mengubah mm/dd/yyyy ke dd/mm/yyyy
                 wilayahList.push({
                     kampung, sls, ppl,
                     start: parseDateFromCSV(start),
@@ -1006,7 +1066,7 @@ function importLegacyCSV(text) {
             let catatan = parts[idxCatatan] || '';
 
             if (!kampung || !tanggal) continue;
-            let parsedTanggal = parseDateFromCSV(tanggal); // konversi ke dd/mm/yyyy
+            let parsedTanggal = parseDateFromCSV(tanggal);
             if (!parsedTanggal) continue;
 
             if (!progressData[kampung]) progressData[kampung] = {};
@@ -1034,12 +1094,10 @@ function importLegacyCSV(text) {
         }
     }
 
-    // Assign hasil parsing ke S
     let petugasList = petugasRaw ? petugasRaw.split(';').map(p=>p.trim()).filter(Boolean) : [''];
     if (petugasList.length === 0) petugasList = [''];
     S.petugas = petugasList;
     if (tujuanVal) S.tujuan = tujuanVal;
-    // Untuk tanggal awal/akhir utama, gunakan parseDateFromCSV
     if (tanggalAwalVal) S.tanggalAwal = parseDateFromCSV(tanggalAwalVal);
     if (tanggalAkhirVal) S.tanggalAkhir = parseDateFromCSV(tanggalAkhirVal);
     if (perihalVal) S.perihal = perihalVal;
@@ -1268,4 +1326,4 @@ renderWilayah();
 renderDokumentasi();
 </script>
 </body>
-    </html>
+</html>
