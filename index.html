@@ -493,11 +493,16 @@ function addWilayah(v={}) {
 }
 function renderWilayah() {
     let html = '';
-    S.wilayah.forEach((x,i) => {
-        let kampungOpts = S.kampung.map(k => `<option value="${esc(k.kampung)}" ${k.kampung===x.kampung?'selected':''}>${esc(k.kampung)}</option>`).join('');
-        let pplOpts = S.petugas.map(p => `<option value="${esc(p)}" ${p===x.ppl?'selected':''}>${esc(p)}</option>`).join('');
-        let startDisplay = formatDateObj(toDateObj(x.start)) || '';
-        let endDisplay = formatDateObj(toDateObj(x.end)) || '';
+    S.wilayah.forEach((x, i) => {
+        let kampungOpts = S.kampung.map(k => `<option value="${esc(k.kampung)}" ${k.kampung === x.kampung ? 'selected' : ''}>${esc(k.kampung)}</option>`).join('');
+        let pplOpts = S.petugas.map(p => `<option value="${esc(p)}" ${p === x.ppl ? 'selected' : ''}>${esc(p)}</option>`).join('');
+        
+        // ===== PERBAIKAN: Cek null sebelum format =====
+        let startDateObj = toDateObj(x.start);
+        let endDateObj = toDateObj(x.end);
+        let startDisplay = startDateObj ? formatDateObj(startDateObj) : '';
+        let endDisplay = endDateObj ? formatDateObj(endDateObj) : '';
+        
         html += `<div class="card">
             <div class="head"><b>Wilayah Tugas ${i+1}</b><button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="S.wilayah.splice(${i},1);renderWilayah()">Hapus</button></div>
             <div class="cols-5">
@@ -518,7 +523,7 @@ function renderWilayah() {
     });
     $("wilayah").innerHTML = html;
 }
-
+    
 function group() {
     let m = new Map();
     S.wilayah.forEach(w => {
