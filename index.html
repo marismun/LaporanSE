@@ -4,8 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Generator Laporan Pendataan BPS</title>
-<!-- Library SheetJS untuk Excel -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Semua CSS tetap di HEAD, Library JS dipindahkan ke bawah BODY -->
 <style>
 :root {
     --primary-navy: #0C3B63;
@@ -1092,7 +1091,7 @@ function exportExcel(){
         link.click(); URL.revokeObjectURL(link.href); $("status").innerHTML='<div class="status">✅ Backup data lengkap berhasil diexport ke Excel (.xlsx).</div>';
     } catch (err) {
         console.error("Error saat Backup Excel:", err);
-        alert("Terjadi error saat Backup Excel. Pastikan library SheetJS termuat atau cek konsol browser (F12).");
+        alert("Terjadi error saat Backup Excel. Pastikan file dimuat ulang atau cek konsol browser (F12).");
     }
 }
 
@@ -1103,20 +1102,18 @@ function importExcel(event){
     let reader = new FileReader();
     reader.onload = function(e) {
         try {
-            // Deteksi apakah file CSV (berdasarkan ekstensi atau awal konten)
+            // Deteksi apakah file CSV
             let isCSV = file.name.toLowerCase().endsWith('.csv');
             if (!isCSV) {
-                // Coba deteksi dari konten: jika mengandung "=== DATA UTAMA ==="
+                // Coba deteksi dari konten
                 let textSample = e.target.result.slice(0, 200);
                 if (textSample.includes('=== DATA UTAMA ===')) {
                     isCSV = true;
                 }
             }
             if (isCSV) {
-                // Gunakan parser CSV lama
                 let text = e.target.result;
                 importLegacyCSV(text);
-                // Render ulang UI
                 renderPetugas();
                 document.getElementById('tujuan').value = S.tujuan || "";
                 if (S.tanggalAwal) {
@@ -1248,5 +1245,8 @@ renderKampung();
 renderWilayah();
 renderDokumentasi();
 </script>
+
+<!-- Library SheetJS dipindahkan ke paling bawah BODY agar terload 100% saat GitHub Pages -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </body>
 </html>
