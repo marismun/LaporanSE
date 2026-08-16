@@ -283,6 +283,38 @@ const S = {
 const $ = id => document.getElementById(id);
 const esc = x => String(x ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 
+
+// ===================== UPLOAD KE GOOGLE DRIVE =====================
+const GOOGLE_DRIVE_WEBAPP_URL = 'YOUR_WEB_APP_URL_HERE'; // Ganti dengan URL Apps Script
+
+function uploadToGoogleDrive(blob, fileName, onSuccess, onError) {
+    // Buat FormData untuk dikirim ke Google Apps Script
+    const formData = new FormData();
+    formData.append('file', blob);
+    formData.append('fileName', fileName);
+    
+    // Kirim ke Web App
+    fetch(GOOGLE_DRIVE_WEBAPP_URL, {
+        method: 'POST',
+        body: formData,
+        // mode: 'no-cors' // Jika Web App tidak support CORS, tambahkan ini
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            if (onSuccess) onSuccess(data);
+        } else {
+            throw new Error(data.error || 'Upload gagal');
+        }
+    })
+    .catch(err => {
+        console.error('Upload Google Drive error:', err);
+        if (onError) onError(err);
+    });
+}
 // ===================== FUNGSI TANGGAL =====================
 function toDateObj(dateStr) {
     if (!dateStr) return null;
@@ -821,25 +853,17 @@ function word(){
     } catch(err){ console.error(err); alert("Error saat Download Word."); }
 }
 
-// ===== GENERATE WORD + UPLOAD KE CLOUDINARY (BACKUP DIAM-DIAM) =====
-function generateOfflineWordAndBackup(resizedImages){
+function generateOfflineWord(resizedImages) {
     try {
         let htmlContent = generateWordHTML(resizedImages);
         let blob = new Blob(["\ufeff" + htmlContent], { type: "application/msword;charset=utf-8" });
 
-        // Ambil nama PPL pertama untuk nama file
-        let pplNames = [];
-        S.wilayah.forEach(w => {
-            if (w.ppl && w.ppl.trim() && !pplNames.includes(w.ppl.trim())) {
-                pplNames.push(w.ppl.trim());
-            }
-        });
-        let ppl = S.petugas.filter(p=>p.trim());
+        let ppl = S.petugas.filter(p => p.trim());
         let namaPpl = ppl.length > 0 ? ppl[0] : "TanpaNama";
         let tanggalSekarang = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }).replace(/\s/g, "_");
         let fileName = `Laporan_Perjalanan_Dinas_Tim_${namaPpl}_${tanggalSekarang}.doc`;
 
-        // ===== DOWNLOAD FILE (tetap dilakukan) =====
+        // ===== DOWNLOAD FILE =====
         let link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = fileName;
@@ -848,38 +872,38 @@ function generateOfflineWordAndBackup(resizedImages){
         document.body.removeChild(link);
         setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 
-        // ===== UPLOAD KE CLOUDINARY (DIAM-DIAM, TIDAK MENGGANGGU USER) =====
-        $("status").innerHTML = '<div class="status">⏳ Mengupload backup Word ke Cloudinary...</div>';
-
-        uploadFileToCloudinary(blob, false, function (wordUrl, displayName) {
+        // ===== UPLOAD KE GOOGLE DRIVE =====
+        $("status").innerHTML = '<div class="status">⏳ Mengupload file ke Google Drive...</div>';
+        
+        uploadToGoogleDrive(blob, fileName, function(data) {
             // Sukses upload
             if (!S.wordBackupUrl) S.wordBackupUrl = [];
             S.wordBackupUrl.push({
-                file: wordUrl,
+                file: data.url,
+                fileId: data.fileId,
                 date: new Date().toISOString(),
                 name: fileName,
                 createdBy: namaPpl
             });
             $("status").innerHTML = `<div class="status" style="background:#d4edda; border-color:#28a745;">
-                ✅ File Word berhasil didownload & di-backup ke Cloudinary!<br>
-                🔗 <a href="${wordUrl}" target="_blank">Lihat Backup di Cloud</a>
+                ✅ File Word berhasil didownload & diupload ke Google Drive!<br>
+                🔗 <a href="${data.url}" target="_blank">Lihat di Google Drive</a>
             </div>`;
-            save(); // simpan state ke localStorage
-        }, function (error) {
-            // Error upload: hanya catat di console dan status ringan (tidak mengganggu)
-            console.error("Upload Cloudinary gagal (diam-diam):", error);
+            save();
+        }, function(error) {
+            // Error upload: hanya catat di console
+            console.error("Upload Google Drive gagal:", error);
             $("status").innerHTML = `<div class="status" style="background:#f8d7da; border-color:#dc3545;">
-                ⚠️ File Word berhasil didownload, tetapi backup ke Cloudinary gagal.<br>
+                ⚠️ File Word berhasil didownload, tetapi upload ke Google Drive gagal.<br>
                 <small>Error: ${error.message || 'Unknown error'}. Coba lagi nanti.</small>
             </div>`;
         });
 
     } catch (err) {
-        console.error("Error di generateOfflineWordAndBackup:", err);
+        console.error("Error di generateOfflineWord:", err);
         alert("Terjadi error pada proses Word. Cek konsol browser (F12).");
     }
 }
-
 // ===================== SAVE, LOAD, RESET =====================
 function save(){
     S.petugas=S.petugas.map(p=>p.trim()).filter(Boolean); if(S.petugas.length===0) S.petugas=[''];
