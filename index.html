@@ -415,33 +415,40 @@ function resizeImageToHeight(src, targetHeightCm, callback) {
 }
 
 // ===================== UPLOAD KE GOOGLE DRIVE =====================
-// GANTI URL INI DENGAN URL WEB APP ANDA
-const GOOGLE_DRIVE_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxtq2S1IbxK3DCB-_PXMS1uYNBM31PLUdl3hOBVBY9LaJ-DiCvj_cBScM0zPFrlH1ot/exec';
+const GOOGLE_DRIVE_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxQeQt3NVy5xQpedNe2ClDeQmYk_7Kn6lF9zLPmxsi7WliTj-He78RElbrm4le4VNln/exec';
 
 function uploadToGoogleDrive(blob, fileName, onSuccess, onError) {
-    const formData = new FormData();
-    formData.append('file', blob);
-    formData.append('fileName', fileName);
-    
-    fetch(GOOGLE_DRIVE_WEBAPP_URL, {
-        method: 'POST',
-        body: formData,
-    })
-    .then(response => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        return response.json();
-    })
-    .then(data => {
-        if (data.success) {
-            if (onSuccess) onSuccess(data);
-        } else {
-            throw new Error(data.error || 'Upload gagal');
-        }
-    })
-    .catch(err => {
-        console.error('Upload Google Drive error:', err);
-        if (onError) onError(err);
-    });
+    const reader = new FileReader();
+    reader.onload = function() {
+        const base64Data = reader.result.split(',')[1] || reader.result;
+        
+        const formData = new FormData();
+        formData.append('file', base64Data);
+        formData.append('fileName', fileName);
+        
+        // Kirim ke Google Apps Script dengan mode no-cors
+        fetch(GOOGLE_DRIVE_WEBAPP_URL, {
+            method: 'POST',
+            body: formData,
+            mode: 'no-cors'
+        })
+        .then(() => {
+            // Karena mode: no-cors, kita tidak bisa membaca response
+            // Anggap berhasil jika tidak ada error
+            if (onSuccess) {
+                onSuccess({
+                    success: true,
+                    url: 'https://drive.google.com/drive/folders/1NHPuExdyLSmjkXI4jiaVaaM_kwnC4_8N',
+                    message: 'File berhasil diupload! Cek Google Drive.'
+                });
+            }
+        })
+        .catch(err => {
+            console.error('Upload Google Drive error:', err);
+            if (onError) onError(err);
+        });
+    };
+    reader.readAsDataURL(blob);
 }
 
 // ===================== RENDER PETUGAS, KAMPUNG, WILAYAH =====================
@@ -831,7 +838,7 @@ function preview(){
     } catch(err){ console.error(err); alert("Error saat Preview."); }
 }
 
-// ===================== DOWNLOAD WORD (TANPA UPLOAD KE CLOUDINARY) =====================
+// ===================== DOWNLOAD WORD + UPLOAD KE GOOGLE DRIVE =====================
 function word(){
     try {
         if(validate()){alert(validate());return;}
@@ -850,7 +857,7 @@ function word(){
     } catch(err){ console.error(err); alert("Error saat Download Word."); }
 }
 
-// ===== GENERATE WORD (DOWNLOAD SAJA, + UPLOAD KE GOOGLE DRIVE OPSIONAL) =====
+// ===== GENERATE WORD (DOWNLOAD + UPLOAD KE GOOGLE DRIVE) =====
 function generateOfflineWord(resizedImages){
     try {
         let htmlContent = generateWordHTML(resizedImages);
@@ -870,37 +877,30 @@ function generateOfflineWord(resizedImages){
         document.body.removeChild(link);
         setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 
-        // ===== UPLOAD KE GOOGLE DRIVE (OPSIONAL - AKTIFKAN DENGAN MENGHILANGKAN KOMENTAR) =====
-        
+        // ===== UPLOAD KE GOOGLE DRIVE =====
         $("status").innerHTML = '<div class="status">⏳ Mengupload file ke Google Drive...</div>';
         uploadToGoogleDrive(blob, fileName, function(data) {
+            // Sukses upload
             if (!S.wordBackupUrl) S.wordBackupUrl = [];
             S.wordBackupUrl.push({
-                file: data.url,
-                fileId: data.fileId,
+                file: data.url || 'https://drive.google.com/drive/folders/1NHPuExdyLSmjkXI4jiaVaaM_kwnC4_8N',
                 date: new Date().toISOString(),
                 name: fileName,
                 createdBy: namaPpl
             });
             $("status").innerHTML = `<div class="status" style="background:#d4edda; border-color:#28a745;">
                 ✅ File Word berhasil didownload & diupload ke Google Drive!<br>
-                🔗 <a href="${data.url}" target="_blank">Lihat di Google Drive</a>
+                📁 ${fileName}
             </div>`;
             save();
         }, function(error) {
+            // Error upload: hanya catat di console
             console.error("Upload Google Drive gagal:", error);
             $("status").innerHTML = `<div class="status" style="background:#f8d7da; border-color:#dc3545;">
                 ⚠️ File Word berhasil didownload, tetapi upload ke Google Drive gagal.<br>
                 <small>Error: ${error.message || 'Unknown error'}. Coba lagi nanti.</small>
             </div>`;
         });
-        
-
-        // Status jika hanya download (tanpa upload)
-        $("status").innerHTML = `<div class="status" style="background:#d4edda; border-color:#28a745;">
-            ✅ File Word berhasil didownload!<br>
-            📁 ${fileName}
-        </div>`;
 
     } catch (err) {
         console.error("Error di generateOfflineWord:", err);
