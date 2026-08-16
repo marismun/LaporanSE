@@ -282,18 +282,30 @@ const S = {
 const $ = id => document.getElementById(id);
 const esc = x => String(x ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 
-// ===================== FUNGSI TANGGAL (ROBUST) =====================
+// ===================== FUNGSI TANGGAL (DIPERBAIKI) =====================
 function toDateObj(dateStr) {
     if (!dateStr) return null;
-    let parts = dateStr.trim().split('/');
+    let s = dateStr.trim();
+    // Coba format dd/mm/yyyy
+    let parts = s.split('/');
     if (parts.length !== 3) return null;
-    let day = parseInt(parts[0], 10);
-    let month = parseInt(parts[1], 10) - 1;
-    let year = parseInt(parts[2], 10);
-    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-    let d = new Date(year, month, day);
-    if (isNaN(d.getTime())) return null;
-    return d;
+    let d1 = parseInt(parts[0], 10);
+    let m1 = parseInt(parts[1], 10) - 1;
+    let y1 = parseInt(parts[2], 10);
+    // Coba sebagai dd/mm/yyyy
+    let date = new Date(y1, m1, d1);
+    if (!isNaN(date.getTime()) && date.getDate() === d1 && date.getMonth() === m1 && date.getFullYear() === y1) {
+        return date;
+    }
+    // Coba sebagai mm/dd/yyyy (US)
+    let d2 = parseInt(parts[1], 10);
+    let m2 = parseInt(parts[0], 10) - 1;
+    let y2 = parseInt(parts[2], 10);
+    date = new Date(y2, m2, d2);
+    if (!isNaN(date.getTime()) && date.getDate() === d2 && date.getMonth() === m2 && date.getFullYear() === y2) {
+        return date;
+    }
+    return null;
 }
 function formatDateObj(d) {
     let day = String(d.getDate()).padStart(2, '0');
@@ -482,7 +494,7 @@ function validate() {
     return "";
 }
 
-// ===================== GENERATE FORM (DIPERBAIKI) =====================
+// ===================== GENERATE FORM =====================
 function generate() {
     let e = validate();
     if (e) { $("status").innerHTML = `<div class="status err">${esc(e)}</div>`; return; }
@@ -495,7 +507,6 @@ function generate() {
             let days = dates(w.start, w.end);
             days.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
         });
-        // Jika tidak ada tanggal, buat dari start pertama
         if (allDates.length === 0 && v.items.length > 0) {
             let firstStart = v.items.find(w => w.start)?.start;
             if (firstStart) allDates.push(parseDate(firstStart));
@@ -545,7 +556,7 @@ function generate() {
     $("status").innerHTML = '<div class="status">✅ Form progres dan dokumentasi berhasil digenerate.</div>';
 }
 
-// ===================== RENDER PROGRESS (SORT TANGGAL) =====================
+// ===================== RENDER PROGRESS =====================
 function setVal(v,d,k,f,val) { S.p[v][d].items[k][f] = val; }
 function metric(v,d,k,f,n) {
     let x = S.p[v][d].items[k];
@@ -819,7 +830,7 @@ function load(){
 }
 function resetAll(){ if(confirm("⚠️ Yakin ingin menghapus SEMUA data?")){ localStorage.removeItem("laporanGenerator"); location.reload(); } }
 
-// ===================== LEGACY CSV PARSER =====================
+// ===================== LEGACY CSV PARSER (DIPERBAIKI) =====================
 function parseCSVLine(line) {
     let result=[], current='', inside=false;
     for(let i=0; i<line.length; i++){
@@ -831,74 +842,202 @@ function parseCSVLine(line) {
     result.push(current.trim());
     return result;
 }
+
 function importLegacyCSV(text) {
     let lines=text.split('\n').map(l=>l.replace(/\r$/,'')).filter(l=>l.trim()!=='');
-    let section='', petugasRaw='', tujuanVal='', tanggalAwalVal='', tanggalAkhirVal='', perihalVal='', nomorSuratVal='';
+    let section='';
+    let petugasRaw='', tujuanVal='', tanggalAwalVal='', tanggalAkhirVal='', perihalVal='', nomorSuratVal='';
     let kampungList=[], wilayahList=[], progressData={}, photoData={}, wordBackupData=[];
-    for(let i=0; i<lines.length; i++){
-        let line=lines[i].trim();
-        if(line.startsWith('=== DATA UTAMA ===')){ section='utama'; continue; }
-        else if(line.startsWith('=== KAMPUNG TUJUAN ===')){ section='kampung'; continue; }
-        else if(line.startsWith('=== WILAYAH TUGAS ===')){ section='wilayah'; continue; }
-        else if(line.startsWith('=== DATA PROGRES ===')){ section='progres'; continue; }
-        else if(line.startsWith('=== DOKUMENTASI ===')){ section='dokumentasi'; continue; }
-        else if(line.startsWith('=== BACKUP WORD ===')){ section='backup'; continue; }
-        if(section==='utama'){
-            if(line.startsWith('Nama Petugas,')) petugasRaw=line.substring('Nama Petugas,'.length).trim();
-            else if(line.startsWith('Tujuan,')) tujuanVal=line.substring('Tujuan,'.length).trim();
-            else if(line.startsWith('Tanggal Awal,')) tanggalAwalVal=line.substring('Tanggal Awal,'.length).trim();
-            else if(line.startsWith('Tanggal Akhir,')) tanggalAkhirVal=line.substring('Tanggal Akhir,'.length).trim();
-            else if(line.startsWith('Perihal,')) perihalVal=line.substring('Perihal,'.length).trim();
-            else if(line.startsWith('Nomor Surat Tugas,')) nomorSuratVal=line.substring('Nomor Surat Tugas,'.length).trim();
-        } else if(section==='kampung'){
-            let parts=parseCSVLine(line);
-            if(parts.length>=4 && parts[0] && !parts[0].includes('Kampung')) kampungList.push({ kampung:parts[0], distrik:parts[1]||'', mengetahui:parts[2]||'', jabatan:parts[3]||'' });
-        } else if(section==='wilayah'){
-            let parts=parseCSVLine(line);
-            if(parts.length>=10 && parts[0] && !parts[0].includes('Kampung')) wilayahList.push({ kampung:parts[0], sls:parts[1], ppl:parts[2], start:parseDate(parts[3])||'', end:parseDate(parts[4])||'', assignmentTotal:parseInt(parts[5])||0, bkuTotal:parseInt(parts[6])||0, keluargaTotal:parseInt(parts[7])||0, bangunanTotal:parseInt(parts[8])||0, usahaTotal:parseInt(parts[9])||0 });
-        } else if(section==='progres'){
-            let parts=parseCSVLine(line);
-            if(parts.length>=10 && parts[0] && !parts[0].includes('Kampung')){
-                let kampung=parts[0], tanggalStr=parts[1], sls=parts[2], ppl=parts[3];
-                let d=toDateObj(tanggalStr);
-                if(!d){
-                    let parts2=tanggalStr.split(' ');
-                    if(parts2.length===3){
-                        let monthMap={'Januari':'01','Februari':'02','Maret':'03','April':'04','Mei':'05','Juni':'06','Juli':'07','Agustus':'08','September':'09','Oktober':'10','November':'11','Desember':'12'};
-                        let day=parts2[0].padStart(2,'0'), month=monthMap[parts2[1]]||'01', year=parts2[2];
-                        if(year.length===2) year='20'+year;
-                        tanggalStr=`${year}-${month}-${day}`;
+
+    // Ambil header untuk wilayah dan progres jika ada
+    let wilayahHeader = null;
+    let progresHeader = null;
+
+    for (let i=0; i<lines.length; i++) {
+        let line = lines[i].trim();
+        if (line.startsWith('=== DATA UTAMA ===')) { section='utama'; continue; }
+        else if (line.startsWith('=== KAMPUNG TUJUAN ===')) { section='kampung'; continue; }
+        else if (line.startsWith('=== WILAYAH TUGAS ===')) { section='wilayah'; continue; }
+        else if (line.startsWith('=== DATA PROGRES ===')) { section='progres'; continue; }
+        else if (line.startsWith('=== DOKUMENTASI ===')) { section='dokumentasi'; continue; }
+        else if (line.startsWith('=== BACKUP WORD ===')) { section='backup'; continue; }
+
+        if (section === 'utama') {
+            if (line.startsWith('Nama Petugas,')) petugasRaw = line.substring('Nama Petugas,'.length).trim();
+            else if (line.startsWith('Tujuan,')) tujuanVal = line.substring('Tujuan,'.length).trim();
+            else if (line.startsWith('Tanggal Awal,')) tanggalAwalVal = line.substring('Tanggal Awal,'.length).trim();
+            else if (line.startsWith('Tanggal Akhir,')) tanggalAkhirVal = line.substring('Tanggal Akhir,'.length).trim();
+            else if (line.startsWith('Perihal,')) perihalVal = line.substring('Perihal,'.length).trim();
+            else if (line.startsWith('Nomor Surat Tugas,')) nomorSuratVal = line.substring('Nomor Surat Tugas,'.length).trim();
+        }
+        else if (section === 'kampung') {
+            let parts = parseCSVLine(line);
+            if (parts.length >= 4 && parts[0] && !parts[0].includes('Kampung')) {
+                kampungList.push({ kampung:parts[0], distrik:parts[1]||'', mengetahui:parts[2]||'', jabatan:parts[3]||'' });
+            }
+        }
+        else if (section === 'wilayah') {
+            // Ambil header jika belum
+            if (!wilayahHeader) {
+                let header = parseCSVLine(line);
+                if (header.length >= 10 && header[0] === 'Kampung') {
+                    wilayahHeader = header.map(h => h.trim());
+                    continue;
+                }
+            }
+            // Parse baris data
+            let parts = parseCSVLine(line);
+            if (parts.length < 10) continue;
+            // Coba cari posisi kolom berdasarkan header
+            let idxKampung = wilayahHeader.indexOf('Kampung');
+            let idxSLS = wilayahHeader.indexOf('SLS');
+            let idxPPL = wilayahHeader.indexOf('Nama PPL') !== -1 ? wilayahHeader.indexOf('Nama PPL') : wilayahHeader.indexOf('PPL');
+            let idxTglAwal = wilayahHeader.indexOf('Tanggal Awal');
+            let idxTglAkhir = wilayahHeader.indexOf('Tanggal Akhir');
+            let idxAssign = wilayahHeader.indexOf('AssignmentTotal');
+            let idxBKU = wilayahHeader.indexOf('BKUTotal');
+            let idxKeluarga = wilayahHeader.indexOf('KeluargaTotal');
+            let idxBangunan = wilayahHeader.indexOf('BangunanTotal');
+            let idxUsaha = wilayahHeader.indexOf('UsahaTotal');
+
+            // Jika header tidak lengkap, fallback ke indeks standar
+            if (idxKampung === -1) idxKampung = 0;
+            if (idxSLS === -1) idxSLS = 1;
+            if (idxPPL === -1) idxPPL = 2;
+            if (idxTglAwal === -1) idxTglAwal = 3;
+            if (idxTglAkhir === -1) idxTglAkhir = 4;
+            if (idxAssign === -1) idxAssign = 5;
+            if (idxBKU === -1) idxBKU = 6;
+            if (idxKeluarga === -1) idxKeluarga = 7;
+            if (idxBangunan === -1) idxBangunan = 8;
+            if (idxUsaha === -1) idxUsaha = 9;
+
+            // Ambil nilai dengan indeks yang sudah ditentukan
+            let kampung = parts[idxKampung] || '';
+            let sls = parts[idxSLS] || '';
+            let ppl = parts[idxPPL] || '';
+            let start = parts[idxTglAwal] || '';
+            let end = parts[idxTglAkhir] || '';
+            let assign = parseInt(parts[idxAssign]) || 0;
+            let bku = parseInt(parts[idxBKU]) || 0;
+            let keluarga = parseInt(parts[idxKeluarga]) || 0;
+            let bangunan = parseInt(parts[idxBangunan]) || 0;
+            let usaha = parseInt(parts[idxUsaha]) || 0;
+
+            // Jika start kosong, coba cari di posisi lain (misal karena koma ekstra)
+            if (!start && idxTglAwal < parts.length-1) {
+                // Coba scan ke kanan sampai dapat tanggal
+                for (let j = idxTglAwal; j < parts.length; j++) {
+                    if (parts[j] && parts[j].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
+                        start = parts[j];
+                        // Jika ketemu, cari end di sebelahnya
+                        if (j+1 < parts.length && parts[j+1].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
+                            end = parts[j+1];
+                            // Ambil nilai assignment setelah end
+                            if (j+2 < parts.length) assign = parseInt(parts[j+2]) || 0;
+                            if (j+3 < parts.length) bku = parseInt(parts[j+3]) || 0;
+                            if (j+4 < parts.length) keluarga = parseInt(parts[j+4]) || 0;
+                            if (j+5 < parts.length) bangunan = parseInt(parts[j+5]) || 0;
+                            if (j+6 < parts.length) usaha = parseInt(parts[j+6]) || 0;
+                        }
+                        break;
                     }
-                } else tanggalStr=formatDateObj(d);
-                if(!progressData[kampung]) progressData[kampung]={};
-                if(!progressData[kampung][tanggalStr]) progressData[kampung][tanggalStr]={ notes:"", items:{} };
-                let key=sls+'||'+ppl;
-                progressData[kampung][tanggalStr].items[key]={ sls, ppl, assignment:parts[4]||'0', bku:parts[5]||'0', keluarga:parts[6]||'0', bangunan:parts[7]||'0', usaha:parts[8]||'0', notes:parts[9]||'' };
+                }
             }
-        } else if(section==='dokumentasi'){
-            let parts=parseCSVLine(line);
-            if(parts.length>=3 && parts[0] && !parts[0].includes('Kampung')){
-                let kampung=parts[0], src=parts[1]||'', caption=parts[2]||'';
-                if(src && src.startsWith('http')){ if(!photoData[kampung]) photoData[kampung]=[]; photoData[kampung].push({ src, caption }); }
+
+            if (kampung && sls && ppl && start && end) {
+                wilayahList.push({ kampung, sls, ppl, start: parseDate(start), end: parseDate(end),
+                    assignmentTotal: assign, bkuTotal: bku, keluargaTotal: keluarga,
+                    bangunanTotal: bangunan, usahaTotal: usaha });
             }
-        } else if(section==='backup'){
-            let parts=parseCSVLine(line);
-            if(parts.length>=4 && parts[0] && !parts[0].includes('Nama_File')) wordBackupData.push({ name:parts[0], file:parts[1], date:parts[2]||'', createdBy:parts[3]||'' });
+        }
+        else if (section === 'progres') {
+            // Ambil header progres jika belum
+            if (!progresHeader) {
+                let header = parseCSVLine(line);
+                if (header.length >= 10 && header[0] === 'Kampung') {
+                    progresHeader = header.map(h => h.trim());
+                    continue;
+                }
+            }
+            let parts = parseCSVLine(line);
+            if (parts.length < 10) continue;
+            let idxKampung = progresHeader.indexOf('Kampung');
+            let idxTanggal = progresHeader.indexOf('Tanggal');
+            let idxSLS = progresHeader.indexOf('SLS');
+            let idxPPL = progresHeader.indexOf('PPL');
+            let idxAssign = progresHeader.indexOf('Assignment');
+            let idxBKU = progresHeader.indexOf('BKU');
+            let idxKeluarga = progresHeader.indexOf('Keluarga');
+            let idxBangunan = progresHeader.indexOf('Bangunan Lainnya');
+            let idxUsaha = progresHeader.indexOf('Usaha');
+            let idxCatatan = progresHeader.indexOf('Catatan SLS');
+
+            if (idxKampung === -1) idxKampung = 0;
+            if (idxTanggal === -1) idxTanggal = 1;
+            if (idxSLS === -1) idxSLS = 2;
+            if (idxPPL === -1) idxPPL = 3;
+            if (idxAssign === -1) idxAssign = 4;
+            if (idxBKU === -1) idxBKU = 5;
+            if (idxKeluarga === -1) idxKeluarga = 6;
+            if (idxBangunan === -1) idxBangunan = 7;
+            if (idxUsaha === -1) idxUsaha = 8;
+            if (idxCatatan === -1) idxCatatan = 9;
+
+            let kampung = parts[idxKampung] || '';
+            let tanggal = parts[idxTanggal] || '';
+            let sls = parts[idxSLS] || '';
+            let ppl = parts[idxPPL] || '';
+            let assign = parts[idxAssign] || '0';
+            let bku = parts[idxBKU] || '0';
+            let keluarga = parts[idxKeluarga] || '0';
+            let bangunan = parts[idxBangunan] || '0';
+            let usaha = parts[idxUsaha] || '0';
+            let catatan = parts[idxCatatan] || '';
+
+            if (!kampung || !tanggal) continue;
+            let parsedTanggal = parseDate(tanggal);
+            if (!parsedTanggal) continue;
+
+            if (!progressData[kampung]) progressData[kampung] = {};
+            if (!progressData[kampung][parsedTanggal]) progressData[kampung][parsedTanggal] = { notes: "", items: {} };
+            let key = sls + '||' + ppl;
+            progressData[kampung][parsedTanggal].items[key] = { sls, ppl, assignment: assign, bku, keluarga, bangunan, usaha, notes: catatan };
+        }
+        else if (section === 'dokumentasi') {
+            let parts = parseCSVLine(line);
+            if (parts.length >= 3 && parts[0] && !parts[0].includes('Kampung')) {
+                let kampung = parts[0];
+                let src = parts[1] || '';
+                let caption = parts[2] || '';
+                if (src && src.startsWith('http')) {
+                    if (!photoData[kampung]) photoData[kampung] = [];
+                    photoData[kampung].push({ src, caption });
+                }
+            }
+        }
+        else if (section === 'backup') {
+            let parts = parseCSVLine(line);
+            if (parts.length >= 4 && parts[0] && !parts[0].includes('Nama_File')) {
+                wordBackupData.push({ name: parts[0], file: parts[1], date: parts[2]||'', createdBy: parts[3]||'' });
+            }
         }
     }
-    let petugasList=petugasRaw?petugasRaw.split(';').map(p=>p.trim()).filter(Boolean):[''];
-    if(petugasList.length===0) petugasList=[''];
-    S.petugas=petugasList;
-    if(tujuanVal) S.tujuan=tujuanVal;
-    if(tanggalAwalVal) S.tanggalAwal=tanggalAwalVal;
-    if(tanggalAkhirVal) S.tanggalAkhir=tanggalAkhirVal;
-    if(perihalVal) S.perihal=perihalVal;
-    if(nomorSuratVal) S.nomorSurat=nomorSuratVal;
-    if(kampungList.length) S.kampung=kampungList;
-    if(wilayahList.length) S.wilayah=wilayahList;
-    if(Object.keys(progressData).length) S.p=progressData;
-    if(Object.keys(photoData).length) S.photos=photoData;
-    if(wordBackupData.length) S.wordBackupUrl=wordBackupData;
+
+    // Assign hasil parsing ke S
+    let petugasList = petugasRaw ? petugasRaw.split(';').map(p=>p.trim()).filter(Boolean) : [''];
+    if (petugasList.length === 0) petugasList = [''];
+    S.petugas = petugasList;
+    if (tujuanVal) S.tujuan = tujuanVal;
+    if (tanggalAwalVal) S.tanggalAwal = parseDate(tanggalAwalVal);
+    if (tanggalAkhirVal) S.tanggalAkhir = parseDate(tanggalAkhirVal);
+    if (perihalVal) S.perihal = perihalVal;
+    if (nomorSuratVal) S.nomorSurat = nomorSuratVal;
+    if (kampungList.length) S.kampung = kampungList;
+    if (wilayahList.length) S.wilayah = wilayahList;
+    if (Object.keys(progressData).length) S.p = progressData;
+    if (Object.keys(photoData).length) S.photos = photoData;
+    if (wordBackupData.length) S.wordBackupUrl = wordBackupData;
 }
 
 // ===================== EXPORT EXCEL & FALLBACK =====================
@@ -1118,4 +1257,4 @@ renderWilayah();
 renderDokumentasi();
 </script>
 </body>
-    </html>
+</html>
