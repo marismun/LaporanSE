@@ -351,17 +351,45 @@ function validateDateFormat(input) {
         setTimeout(() => input.style.borderColor = '', 3000);
     }
 }
+
+// SMART PARSING: mm/dd/yyyy -> dd/mm/yyyy
 function parseDateFromCSV(dateStr) {
     if (!dateStr) return '';
     let s = dateStr.trim();
-    let parts = s.split('/');
+    // Tangani kemungkinan format dengan / atau -
+    let parts = s.split(/[\/\-]/);
     if (parts.length !== 3) return s;
-    let month = parseInt(parts[0], 10) - 1;
-    let day = parseInt(parts[1], 10);
-    let year = parseInt(parts[2], 10);
-    if (isNaN(month) || isNaN(day) || isNaN(year)) return s;
+    
+    let p0 = parseInt(parts[0], 10);
+    let p1 = parseInt(parts[1], 10);
+    let p2 = parseInt(parts[2], 10);
+    
+    if (isNaN(p0) || isNaN(p1) || isNaN(p2)) return s;
+    
+    let year = p2; // Format selalu diakhiri yyyy (xx/xx/yyyy)
+    let day, month;
+    
+    // Deteksi cerdas antara dd/mm/yyyy vs mm/dd/yyyy
+    if (p0 > 12) {
+        // Jika bagian pertama > 12, maka PASTI hari (dd/mm/yyyy) 
+        // Contoh: 18/07/2026
+        day = p0;
+        month = p1 - 1;
+    } else if (p1 > 12) {
+        // Jika bagian kedua > 12, maka PASTI hari (mm/dd/yyyy)
+        // Contoh: 07/18/2026
+        month = p0 - 1;
+        day = p1;
+    } else {
+        // Jika ambigu (contoh 07/08/2026) -> Prioritaskan mm/dd/yyyy sesuai instruksi
+        month = p0 - 1; // p0 adalah bulan
+        day = p1;       // p1 adalah hari
+    }
+    
     let d = new Date(year, month, day);
     if (isNaN(d.getTime())) return s;
+    
+    // Selalu kembalikan dalam format dd/mm/yyyy untuk isian (input fields)
     return formatDateObj(d);
 }
 
@@ -1200,11 +1228,12 @@ function exportExcel() {
     fallbackExportCSV();
 }
 function fallbackExportCSV() {
+    // Di file CSV asli, data diekspor sebagai mm/dd/yyyy
     function toCSVDate(dd_mm_yyyy) {
         if (!dd_mm_yyyy) return '';
         let parts = dd_mm_yyyy.split('/');
         if (parts.length !== 3) return dd_mm_yyyy;
-        return `${parts[1]}/${parts[0]}/${parts[2]}`;
+        return `${parts[1]}/${parts[0]}/${parts[2]}`; // mm/dd/yyyy
     }
 
     const rows = [];
