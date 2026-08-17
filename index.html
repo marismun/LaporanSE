@@ -303,7 +303,7 @@ function toDateObj(dateStr) {
     return null;
 }
 function formatDateObj(d) {
-    if (!d) return ""; // Mencegah crash jika data tanggal kosong
+    if (!d) return "";
     let day = String(d.getDate()).padStart(2, '0');
     let month = String(d.getMonth() + 1).padStart(2, '0');
     let year = d.getFullYear();
@@ -353,24 +353,29 @@ function validateDateFormat(input) {
     }
 }
 
-// STRICT PARSING: mm/dd/yyyy -> dd/mm/yyyy
+// STRICT PARSING: Membaca mutlak format Bulan/Hari/Tahun (m/d/yyyy, mm/dd/yyyy, dll) dengan delimiter '/'
 function parseDateFromCSV(dateStr) {
     if (!dateStr) return '';
     let s = dateStr.trim();
-    let parts = s.split(/[\/\-]/);
+    
+    // Pecah hanya menggunakan garis miring (/)
+    let parts = s.split('/');
     if (parts.length !== 3) return s;
     
-    // Baca mutlak sebagai mm/dd/yyyy sesuai instruksi
-    let month = parseInt(parts[0], 10) - 1; // Bagian 1: bulan (0-indexed)
-    let day = parseInt(parts[1], 10);       // Bagian 2: hari
-    let year = parseInt(parts[2], 10);      // Bagian 3: tahun
+    // Berapapun digitnya (contoh: '7' atau '07'), parseInt akan menjadikannya angka yang benar.
+    // parts[0] = Bulan (0-indexed di JS, jadi dikurangi 1)
+    // parts[1] = Hari
+    // parts[2] = Tahun
+    let month = parseInt(parts[0], 10) - 1; 
+    let day = parseInt(parts[1], 10);
+    let year = parseInt(parts[2], 10);
     
     if (isNaN(month) || isNaN(day) || isNaN(year)) return s;
     
     let d = new Date(year, month, day);
     if (isNaN(d.getTime())) return s;
     
-    // Kembalikan dalam format dd/mm/yyyy untuk isian (input fields)
+    // Kembalikan ke dalam format string dd/mm/yyyy untuk isian (input fields)
     return formatDateObj(d);
 }
 
@@ -465,7 +470,6 @@ function renderWilayah() {
         let kampungOpts = S.kampung.map(k => `<option value="${esc(k.kampung)}" ${k.kampung===x.kampung?'selected':''}>${esc(k.kampung)}</option>`).join('');
         let pplOpts = S.petugas.map(p => `<option value="${esc(p)}" ${p===x.ppl?'selected':''}>${esc(p)}</option>`).join('');
         
-        // Membaca tanggal langsung dari object, menghindari format berulang yang menyebabkan crash jika kosong
         let startDisplay = x.start || '';
         let endDisplay = x.end || '';
         
