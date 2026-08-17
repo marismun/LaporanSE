@@ -356,10 +356,10 @@ function parseDateFromCSV(dateStr) {
     let s = dateStr.trim();
     let parts = s.split('/');
     if (parts.length !== 3) return s;
-    let month = parseInt(parts[0], 10) - 1;
-    let day = parseInt(parts[1], 10);
+    let day = parseInt(parts[0], 10);
+    let month = parseInt(parts[1], 10) - 1;
     let year = parseInt(parts[2], 10);
-    if (isNaN(month) || isNaN(day) || isNaN(year)) return s;
+    if (isNaN(day) || isNaN(month) || isNaN(year)) return s;
     let d = new Date(year, month, day);
     if (isNaN(d.getTime())) return s;
     return formatDateObj(d);
@@ -928,7 +928,6 @@ function detectDelimiter(line) {
     return ',';
 }
 function parseCSVLine(line) {
-    // Hapus BOM jika ada
     if (line.charCodeAt(0) === 0xFEFF) line = line.slice(1);
     const delimiter = detectDelimiter(line);
     let result=[], current='', inside=false;
@@ -942,180 +941,219 @@ function parseCSVLine(line) {
     return result;
 }
 
-// ===================== IMPORT LEGACY CSV =====================
+// ===================== IMPORT LEGACY CSV (ROBUST) =====================
 function importLegacyCSV(text) {
-    // Hapus BOM jika ada
     if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-    let lines = text.split('\n')
-        .map(l => l.replace(/\r$/, ''))
-        .filter(l => {
-            const trimmed = l.trim();
-            return trimmed !== '' && !trimmed.startsWith('#') && !trimmed.startsWith('//') && !trimmed.includes('#ERROR!');
-        });
 
-    let section = '';
-    let petugasRaw = '', tujuanVal = '', tanggalAwalVal = '', tanggalAkhirVal = '',
-        perihalVal = '', nomorSuratVal = '';
-    let kampungList = [], wilayahList = [], progressData = {}, photoData = {}, wordBackupData = [];
-    let wilayahHeader = null, progresHeader = null;
+    let lines = text.split('\n').map(l => l.replace(/\r$/, ''));
+    let i = 0;
+    let totalLines = lines.length;
 
-    for (let i = 0; i < lines.length; i++) {
+    // State
+    let rawMeta = {};
+    let rawKampung = [];
+    let rawWilayah = [];
+    let rawProgres = [];
+    let rawDokumen = [];
+    let rawBackup = [];
+
+    while (i < totalLines) {
         let line = lines[i].trim();
-        if (line.startsWith('=== DATA UTAMA ===')) { section = 'utama'; continue; }
-        if (line.startsWith('=== KAMPUNG TUJUAN ===')) { section = 'kampung'; continue; }
-        if (line.startsWith('=== WILAYAH TUGAS ===')) { section = 'wilayah'; continue; }
-        if (line.startsWith('=== DATA PROGRES ===')) { section = 'progres'; continue; }
-        if (line.startsWith('=== DOKUMENTASI ===')) { section = 'dokumentasi'; continue; }
-        if (line.startsWith('=== BACKUP WORD ===')) { section = 'backup'; continue; }
+        // Skip empty or error markers
+        if (line === '' || line.includes('#ERROR!')) {
+            i++;
+            continue;
+        }
 
+        // --- 1. DETEKSI METADATA (key: value) ---
         let parts = parseCSVLine(line);
+        if (parts.length >= 2) {
+            let key = parts[0].trim();
+            let val = parts.slice(1).join(',').trim();
+            if (key === 'Nama Petugas') { rawMeta.petugas = val; i++; continue; }
+            if (key === 'Tujuan') { rawMeta.tujuan = val; i++; continue; }
+            if (key === 'Tanggal Awal') { rawMeta.tglAwal = val; i++; continue; }
+            if (key === 'Tanggal Akhir') { rawMeta.tglAkhir = val; i++; continue; }
+            if (key === 'Perihal') { rawMeta.perihal = val; i++; continue; }
+            if (key === 'Nomor Surat Tugas') { rawMeta.nomor = val; i++; continue; }
+        }
 
-        if (section === 'utama') {
-            if (parts[0] === 'Nama Petugas') petugasRaw = parts.slice(1).join(' ').trim();
-            else if (parts[0] === 'Tujuan') tujuanVal = parts.slice(1).join(' ').trim();
-            else if (parts[0] === 'Tanggal Awal') tanggalAwalVal = parts.slice(1).join(' ').trim();
-            else if (parts[0] === 'Tanggal Akhir') tanggalAkhirVal = parts.slice(1).join(' ').trim();
-            else if (parts[0] === 'Perihal') perihalVal = parts.slice(1).join(' ').trim();
-            else if (parts[0] === 'Nomor Surat Tugas') nomorSuratVal = parts.slice(1).join(' ').trim();
-        }
-        else if (section === 'kampung') {
-            if (parts.length >= 4 && parts[0] && parts[0].toLowerCase() !== 'kampung') {
-                kampungList.push({
-                    kampung: parts[0] || '',
-                    distrik: parts[1] || '',
-                    mengetahui: parts[2] || '',
-                    jabatan: parts[3] || ''
-                });
-            }
-        }
-        else if (section === 'wilayah') {
-            if (!wilayahHeader) {
-                if (parts.length >= 10 && parts[0].toLowerCase() === 'kampung') {
-                    wilayahHeader = parts.map(h => h.trim());
-                    continue;
-                } else {
-                    continue; // lewati sampai header valid
+        // --- 2. DETEKSI HEADER KAMPUNG ---
+        if (line.includes('Kampung') && line.includes('Distrik') && line.includes('Mengetahui') && line.includes('Jabatan')) {
+            i++; // skip header
+            while (i < totalLines) {
+                let next = lines[i].trim();
+                if (next === '' || next.includes('#ERROR!')) { i++; continue; }
+                // Berhenti jika ketemu header lain atau key metadata
+                if (next.includes('SLS') || next.includes('Cloudinary') || next.includes('Nama_File') || 
+                    (next.includes('Nama Petugas') && next.includes('Tujuan'))) break;
+                let parts2 = parseCSVLine(next);
+                if (parts2.length >= 4) {
+                    rawKampung.push({
+                        kampung: parts2[0] || '',
+                        distrik: parts2[1] || '',
+                        mengetahui: parts2[2] || '',
+                        jabatan: parts2[3] || ''
+                    });
                 }
+                i++;
             }
-            if (parts.length < 10) continue;
-
-            const getVal = (arr, idx, def = '') => (idx >= 0 && idx < arr.length) ? arr[idx] : def;
-            const idxKampung = wilayahHeader.indexOf('Kampung') !== -1 ? wilayahHeader.indexOf('Kampung') : 0;
-            const idxSLS = wilayahHeader.indexOf('SLS') !== -1 ? wilayahHeader.indexOf('SLS') : 1;
-            const idxPPL = (wilayahHeader.indexOf('Nama PPL') !== -1 ? wilayahHeader.indexOf('Nama PPL') : wilayahHeader.indexOf('PPL'));
-            const idxTglAwal = wilayahHeader.indexOf('Tanggal Awal');
-            const idxTglAkhir = wilayahHeader.indexOf('Tanggal Akhir');
-            const idxAssign = wilayahHeader.indexOf('AssignmentTotal');
-            const idxBKU = wilayahHeader.indexOf('BKUTotal');
-            const idxKeluarga = wilayahHeader.indexOf('KeluargaTotal');
-            const idxBangunan = wilayahHeader.indexOf('BangunanTotal');
-            const idxUsaha = wilayahHeader.indexOf('UsahaTotal');
-
-            let kampung = getVal(parts, idxKampung);
-            let sls = getVal(parts, idxSLS);
-            let ppl = getVal(parts, idxPPL !== -1 ? idxPPL : 2);
-            let start = getVal(parts, idxTglAwal !== -1 ? idxTglAwal : 3);
-            let end = getVal(parts, idxTglAkhir !== -1 ? idxTglAkhir : 4);
-            let assign = parseInt(getVal(parts, idxAssign !== -1 ? idxAssign : 5)) || 0;
-            let bku = parseInt(getVal(parts, idxBKU !== -1 ? idxBKU : 6)) || 0;
-            let keluarga = parseInt(getVal(parts, idxKeluarga !== -1 ? idxKeluarga : 7)) || 0;
-            let bangunan = parseInt(getVal(parts, idxBangunan !== -1 ? idxBangunan : 8)) || 0;
-            let usaha = parseInt(getVal(parts, idxUsaha !== -1 ? idxUsaha : 9)) || 0;
-
-            if (kampung && sls && ppl && start && end) {
-                wilayahList.push({
-                    kampung, sls, ppl,
-                    start: parseDateFromCSV(start), // mm/dd/yyyy -> dd/mm/yyyy
-                    end: parseDateFromCSV(end),
-                    assignmentTotal: assign, bkuTotal: bku, keluargaTotal: keluarga,
-                    bangunanTotal: bangunan, usahaTotal: usaha
-                });
-            }
+            continue;
         }
-        else if (section === 'progres') {
-            if (!progresHeader) {
-                if (parts.length >= 10 && parts[0].toLowerCase() === 'kampung') {
-                    progresHeader = parts.map(h => h.trim());
-                    continue;
-                } else {
-                    continue;
+
+        // --- 3. DETEKSI HEADER WILAYAH ---
+        if (line.includes('SLS') && line.includes('Nama PPL') && line.includes('Tanggal Awal') && line.includes('Tanggal Akhir') && line.includes('AssignmentTotal')) {
+            i++; // skip header
+            while (i < totalLines) {
+                let next = lines[i].trim();
+                if (next === '' || next.includes('#ERROR!')) { i++; continue; }
+                if (next.includes('Kampung') && next.includes('Distrik') && next.includes('Mengetahui')) break;
+                if (next.includes('Cloudinary')) break;
+                if (next.includes('Nama_File')) break;
+                let parts2 = parseCSVLine(next);
+                if (parts2.length >= 10) {
+                    rawWilayah.push({
+                        kampung: parts2[0] || '',
+                        sls: parts2[1] || '',
+                        ppl: parts2[2] || '',
+                        start: parseDateFromCSV(parts2[3] || ''),
+                        end: parseDateFromCSV(parts2[4] || ''),
+                        assignmentTotal: parseInt(parts2[5]) || 0,
+                        bkuTotal: parseInt(parts2[6]) || 0,
+                        keluargaTotal: parseInt(parts2[7]) || 0,
+                        bangunanTotal: parseInt(parts2[8]) || 0,
+                        usahaTotal: parseInt(parts2[9]) || 0
+                    });
                 }
+                i++;
             }
-            if (parts.length < 10) continue;
-
-            const getVal = (arr, idx, def = '') => (idx >= 0 && idx < arr.length) ? arr[idx] : def;
-            const idxKampung = progresHeader.indexOf('Kampung') !== -1 ? progresHeader.indexOf('Kampung') : 0;
-            const idxTanggal = progresHeader.indexOf('Tanggal') !== -1 ? progresHeader.indexOf('Tanggal') : 1;
-            const idxSLS = progresHeader.indexOf('SLS') !== -1 ? progresHeader.indexOf('SLS') : 2;
-            const idxPPL = progresHeader.indexOf('PPL') !== -1 ? progresHeader.indexOf('PPL') : 3;
-            const idxAssign = progresHeader.indexOf('Assignment') !== -1 ? progresHeader.indexOf('Assignment') : 4;
-            const idxBKU = progresHeader.indexOf('BKU') !== -1 ? progresHeader.indexOf('BKU') : 5;
-            const idxKeluarga = progresHeader.indexOf('Keluarga') !== -1 ? progresHeader.indexOf('Keluarga') : 6;
-            const idxBangunan = progresHeader.indexOf('Bangunan Lainnya') !== -1 ? progresHeader.indexOf('Bangunan Lainnya') : 7;
-            const idxUsaha = progresHeader.indexOf('Usaha') !== -1 ? progresHeader.indexOf('Usaha') : 8;
-            const idxCatatan = progresHeader.indexOf('Catatan') !== -1 ? progresHeader.indexOf('Catatan') : 9;
-
-            let kampung = getVal(parts, idxKampung);
-            let tanggal = getVal(parts, idxTanggal);
-            let sls = getVal(parts, idxSLS);
-            let ppl = getVal(parts, idxPPL);
-            let assign = getVal(parts, idxAssign, '0');
-            let bku = getVal(parts, idxBKU, '0');
-            let keluarga = getVal(parts, idxKeluarga, '0');
-            let bangunan = getVal(parts, idxBangunan, '0');
-            let usaha = getVal(parts, idxUsaha, '0');
-            let catatan = getVal(parts, idxCatatan);
-
-            if (!kampung || !tanggal) continue;
-            let parsedTanggal = parseDateFromCSV(tanggal);
-            if (!parsedTanggal) continue;
-
-            if (!progressData[kampung]) progressData[kampung] = {};
-            if (!progressData[kampung][parsedTanggal]) progressData[kampung][parsedTanggal] = { notes: "", items: {} };
-            let key = sls + '||' + ppl;
-            progressData[kampung][parsedTanggal].items[key] = {
-                sls, ppl,
-                assignment: assign, bku, keluarga, bangunan, usaha,
-                notes: catatan
-            };
+            continue;
         }
-        else if (section === 'dokumentasi') {
-            if (parts.length >= 3 && parts[0] && parts[0].toLowerCase() !== 'kampung') {
-                let kampung = parts[0] || '';
-                let src = parts[1] || '';
-                let caption = parts[2] || '';
-                if (src && src.startsWith('http')) {
-                    if (!photoData[kampung]) photoData[kampung] = [];
-                    photoData[kampung].push({ src, caption });
+
+        // --- 4. DETEKSI HEADER PROGRES (Catatan SLS) ---
+        if (line.includes('Tanggal') && line.includes('SLS') && line.includes('PPL') && 
+            line.includes('Assignment') && line.includes('BKU') && line.includes('Keluarga') && 
+            line.includes('Bangunan Lainnya') && line.includes('Usaha') && line.includes('Catatan SLS')) {
+            i++; // skip header
+            while (i < totalLines) {
+                let next = lines[i].trim();
+                if (next === '' || next.includes('#ERROR!')) { i++; continue; }
+                if (next.includes('Kampung') && next.includes('Distrik') && next.includes('Mengetahui')) break;
+                if (next.includes('Cloudinary')) break;
+                if (next.includes('Nama_File')) break;
+                let parts2 = parseCSVLine(next);
+                if (parts2.length >= 10) {
+                    rawProgres.push({
+                        kampung: parts2[0] || '',
+                        tanggal: parseDateFromCSV(parts2[1] || ''),
+                        sls: parts2[2] || '',
+                        ppl: parts2[3] || '',
+                        assignment: parts2[4] || '0',
+                        bku: parts2[5] || '0',
+                        keluarga: parts2[6] || '0',
+                        bangunan: parts2[7] || '0',
+                        usaha: parts2[8] || '0',
+                        catatan: parts2[9] || ''
+                    });
                 }
+                i++;
             }
+            continue;
         }
-        else if (section === 'backup') {
-            if (parts.length >= 4 && parts[0] && parts[0].toLowerCase() !== 'nama_file') {
-                wordBackupData.push({
-                    name: parts[0] || '',
-                    file: parts[1] || '',
-                    date: parts[2] || '',
-                    createdBy: parts[3] || ''
-                });
+
+        // --- 5. DETEKSI HEADER DOKUMENTASI ---
+        if (line.includes('Cloudinary_URL_Gambar') && line.includes('Caption')) {
+            i++; // skip header
+            while (i < totalLines) {
+                let next = lines[i].trim();
+                if (next === '' || next.includes('#ERROR!')) { i++; continue; }
+                if (next.includes('Kampung') && next.includes('Distrik') && next.includes('Mengetahui')) break;
+                if (next.includes('SLS')) break;
+                if (next.includes('Nama_File')) break;
+                let parts2 = parseCSVLine(next);
+                if (parts2.length >= 3 && parts2[0] && parts2[1] && parts2[1].startsWith('http')) {
+                    rawDokumen.push({
+                        kampung: parts2[0] || '',
+                        src: parts2[1] || '',
+                        caption: parts2[2] || ''
+                    });
+                }
+                i++;
             }
+            continue;
         }
+
+        // --- 6. DETEKSI HEADER BACKUP WORD ---
+        if (line.includes('Nama_File') && line.includes('Cloudinary_Word_URL') && line.includes('Tanggal_Dibuat') && line.includes('Dibuat_oleh')) {
+            i++; // skip header
+            while (i < totalLines) {
+                let next = lines[i].trim();
+                if (next === '' || next.includes('#ERROR!')) { i++; continue; }
+                if (next.includes('Kampung') && next.includes('Distrik') && next.includes('Mengetahui')) break;
+                if (next.includes('SLS')) break;
+                if (next.includes('Cloudinary_URL_Gambar')) break;
+                let parts2 = parseCSVLine(next);
+                if (parts2.length >= 4) {
+                    rawBackup.push({
+                        name: parts2[0] || '',
+                        file: parts2[1] || '',
+                        date: parts2[2] || '',
+                        createdBy: parts2[3] || ''
+                    });
+                }
+                i++;
+            }
+            continue;
+        }
+
+        i++;
     }
 
-    // Terapkan hasil import
-    let petugasList = petugasRaw ? petugasRaw.split(';').map(p => p.trim()).filter(Boolean) : [''];
-    if (petugasList.length === 0) petugasList = [''];
-    S.petugas = petugasList;
-    if (tujuanVal) S.tujuan = tujuanVal;
-    if (tanggalAwalVal) S.tanggalAwal = parseDateFromCSV(tanggalAwalVal);
-    if (tanggalAkhirVal) S.tanggalAkhir = parseDateFromCSV(tanggalAkhirVal);
-    if (perihalVal) S.perihal = perihalVal;
-    if (nomorSuratVal) S.nomorSurat = nomorSuratVal;
-    if (kampungList.length) S.kampung = kampungList;
-    if (wilayahList.length) S.wilayah = wilayahList;
-    if (Object.keys(progressData).length) S.p = progressData;
-    if (Object.keys(photoData).length) S.photos = photoData;
-    if (wordBackupData.length) S.wordBackupUrl = wordBackupData;
+    // --- TERAPKAN KE STATE ---
+    if (rawMeta.petugas) {
+        S.petugas = rawMeta.petugas.split(';').map(p => p.trim()).filter(Boolean);
+        if (S.petugas.length === 0) S.petugas = [''];
+        S.tujuan = rawMeta.tujuan || '';
+        S.tanggalAwal = parseDateFromCSV(rawMeta.tglAwal);
+        S.tanggalAkhir = parseDateFromCSV(rawMeta.tglAkhir);
+        S.perihal = rawMeta.perihal || "Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026";
+        S.nomorSurat = rawMeta.nomor || '';
+    }
+    if (rawKampung.length) S.kampung = rawKampung;
+    if (rawWilayah.length) S.wilayah = rawWilayah;
+
+    if (rawProgres.length) {
+        let p = {};
+        rawProgres.forEach(row => {
+            if (!row.kampung || !row.tanggal) return;
+            if (!p[row.kampung]) p[row.kampung] = {};
+            if (!p[row.kampung][row.tanggal]) p[row.kampung][row.tanggal] = { notes: "", items: {} };
+            let key = row.sls + '||' + row.ppl;
+            p[row.kampung][row.tanggal].items[key] = {
+                sls: row.sls,
+                ppl: row.ppl,
+                assignment: row.assignment,
+                bku: row.bku,
+                keluarga: row.keluarga,
+                bangunan: row.bangunan,
+                usaha: row.usaha,
+                notes: row.catatan
+            };
+        });
+        S.p = p;
+    }
+
+    if (rawDokumen.length) {
+        let photos = {};
+        rawDokumen.forEach(row => {
+            if (!row.kampung || !row.src) return;
+            if (!photos[row.kampung]) photos[row.kampung] = [];
+            photos[row.kampung].push({ src: row.src, caption: row.caption || '' });
+        });
+        S.photos = photos;
+    }
+
+    if (rawBackup.length) S.wordBackupUrl = rawBackup;
 }
 
 // ===================== EXPORT EXCEL =====================
@@ -1390,4 +1428,4 @@ renderWilayah();
 renderDokumentasi();
 </script>
 </body>
-        </html>
+    </html>
