@@ -287,25 +287,30 @@ const S = {
 const $ = id => document.getElementById(id);
 const esc = x => String(x ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 
-// ===================== FUNGSI TANGGAL (INTI SISTEM: dd/mm/yyyy) =====================
-
-// System Core membaca mutlak bagian pertama sebagai HARI (dd/mm/yyyy)
+// ===================== FUNGSI TANGGAL =====================
+// System Core: dd/mm/yyyy
 function toDateObj(dateStr) {
     if (!dateStr) return null;
     let s = dateStr.trim();
     let parts = s.split('/');
     if (parts.length !== 3) return null;
-    let d = parseInt(parts[0], 10); // HARI
-    let m = parseInt(parts[1], 10) - 1; // BULAN
-    let y = parseInt(parts[2], 10); // TAHUN
+    let d = parseInt(parts[0], 10);
+    let m = parseInt(parts[1], 10) - 1;
+    let y = parseInt(parts[2], 10);
     let date = new Date(y, m, d);
     if (!isNaN(date.getTime()) && date.getDate() === d && date.getMonth() === m && date.getFullYear() === y) {
+        return date;
+    }
+    // Fallback: coba interpretasi mm/dd/yyyy
+    let tempD = parseInt(parts[1], 10);
+    let tempM = parseInt(parts[0], 10) - 1;
+    date = new Date(y, tempM, tempD);
+    if (!isNaN(date.getTime()) && date.getDate() === tempD && date.getMonth() === tempM && date.getFullYear() === y) {
         return date;
     }
     return null;
 }
 
-// System Core mengeluarkan string mutlak format HARI/BULAN/TAHUN (dd/mm/yyyy)
 function formatDateObj(d) {
     if (!d) return "";
     let day = String(d.getDate()).padStart(2, '0');
@@ -358,27 +363,35 @@ function validateDateFormat(input) {
     }
 }
 
-// JEMBATAN ADAPTASI KHUSUS CSV: Membaca m/d/yyyy -> Mengeluarkan dd/mm/yyyy
+// JEMBATAN ADAPTASI CSV: coba mm/dd/yyyy, jika gagal coba dd/mm/yyyy
 function parseDateFromCSV(dateStr) {
     if (!dateStr) return '';
     let s = dateStr.trim();
-    
-    // Baku: hanya pisahkan dengan garis miring
     let parts = s.split('/');
     if (parts.length !== 3) return s;
-    
-    // Baku: Urutan mutlak Bulan/Hari/Tahun (baik 1 atau 2 digit)
-    let month = parseInt(parts[0], 10) - 1; // Bagian pertama = Bulan (dikurangi 1 untuk format Date JS)
-    let day = parseInt(parts[1], 10);       // Bagian kedua = Hari
-    let year = parseInt(parts[2], 10);      // Bagian ketiga = Tahun
-    
-    if (isNaN(month) || isNaN(day) || isNaN(year)) return s;
-    
-    let d = new Date(year, month, day);
-    if (isNaN(d.getTime())) return s;
-    
-    // Masukkan ke web form sebagai dd/mm/yyyy dengan memanggil formatDateObj
-    return formatDateObj(d);
+    let first = parseInt(parts[0], 10);
+    let second = parseInt(parts[1], 10);
+    let year = parseInt(parts[2], 10);
+    if (isNaN(first) || isNaN(second) || isNaN(year)) return s;
+
+    // Coba format mm/dd/yyyy (default CSV)
+    let month = first - 1;
+    let day = second;
+    let date = new Date(year, month, day);
+    if (!isNaN(date.getTime()) && date.getMonth() === month && date.getDate() === day && date.getFullYear() === year) {
+        return formatDateObj(date);
+    }
+
+    // Jika gagal, coba format dd/mm/yyyy
+    month = second - 1;
+    day = first;
+    date = new Date(year, month, day);
+    if (!isNaN(date.getTime()) && date.getMonth() === month && date.getDate() === day && date.getFullYear() === year) {
+        return formatDateObj(date);
+    }
+
+    // Jika keduanya tidak valid, kembalikan string asli
+    return s;
 }
 
 // ===================== CLOUDINARY =====================
@@ -1419,4 +1432,4 @@ renderWilayah();
 renderDokumentasi();
 </script>
 </body>
-</html>
+    </html>
