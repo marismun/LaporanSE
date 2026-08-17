@@ -119,6 +119,11 @@ input:focus,select:focus,textarea:focus{
     box-shadow:0 0 0 3px rgba(12,59,99,0.1);
 }
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.cols-5 {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+}
 .card{border:1px solid #e2e8f0;background:#fafbfc;padding:14px;margin:10px 0;border-radius:var(--radius-sm);transition:0.2s;}
 .card:hover{border-color:var(--primary-navy)}
 .head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;}
@@ -288,18 +293,11 @@ function toDateObj(dateStr) {
     let s = dateStr.trim();
     let parts = s.split('/');
     if (parts.length !== 3) return null;
-    let d1 = parseInt(parts[0], 10);
-    let m1 = parseInt(parts[1], 10) - 1;
-    let y1 = parseInt(parts[2], 10);
-    let date = new Date(y1, m1, d1);
-    if (!isNaN(date.getTime()) && date.getDate() === d1 && date.getMonth() === m1 && date.getFullYear() === y1) {
-        return date;
-    }
-    let d2 = parseInt(parts[1], 10);
-    let m2 = parseInt(parts[0], 10) - 1;
-    let y2 = parseInt(parts[2], 10);
-    date = new Date(y2, m2, d2);
-    if (!isNaN(date.getTime()) && date.getDate() === d2 && date.getMonth() === m2 && date.getFullYear() === y2) {
+    let d = parseInt(parts[0], 10);
+    let m = parseInt(parts[1], 10) - 1;
+    let y = parseInt(parts[2], 10);
+    let date = new Date(y, m, d);
+    if (!isNaN(date.getTime()) && date.getDate() === d && date.getMonth() === m && date.getFullYear() === y) {
         return date;
     }
     return null;
@@ -367,7 +365,7 @@ function parseDateFromCSV(dateStr) {
     return formatDateObj(d);
 }
 
-// ===================== CLOUDINARY (HANYA UNTUK GAMBAR) =====================
+// ===================== CLOUDINARY =====================
 const CLOUDINARY_CLOUD_NAME = "uxr4cmqd";
 const CLOUDINARY_UPLOAD_PRESET = "Laporan";
 
@@ -510,6 +508,9 @@ function validate() {
     if (!S.perihal) return "Perihal belum diisi.";
     if (!S.nomorSurat) return "Nomor Surat Tugas belum diisi.";
     if (!S.kampung.length) return "Tambahkan kampung.";
+    if (S.kampung.some(k => !k.kampung || !k.kampung.trim())) return "Ada nama kampung yang masih kosong.";
+    const namaKampung = S.kampung.map(k => k.kampung.trim().toLowerCase());
+    if (new Set(namaKampung).size !== namaKampung.length) return "Nama kampung tidak boleh duplikat.";
     if (!S.wilayah.length) return "Tambahkan wilayah tugas.";
     for (let i=0; i<S.wilayah.length; i++) {
         let w = S.wilayah[i];
@@ -606,8 +607,8 @@ function renderProgress() {
         if (last && !isLastKampung) labelLast = " — HARI TERAKHIR KAMPUNG (SEBELUM PINDAH)";
         else if (last && isLastKampung) labelLast = " — HARI TERAKHIR KAMPUNG (PENUTUPAN)";
         h += `<div class="day ${last?"last":""}"><h4>${fmt(d)}${labelLast}</h4><div class="daybody">`;
-        let items = S.p[v.name][d].items;
-        if (items && Object.keys(items).length > 0) {
+        let items = (S.p[v.name] && S.p[v.name][d] && S.p[v.name][d].items) || {};
+        if (Object.keys(items).length > 0) {
             v.items.filter(w => {
                 let dw = toDateObj(d), sw = toDateObj(w.start), ew = toDateObj(w.end);
                 return sw && ew && dw >= sw && dw <= ew;
@@ -642,6 +643,8 @@ function renderProgress() {
 function renderDokumentasi() {
     let vs = group();
     if (vs.length === 0) { $("docNav").innerHTML = '<p style="color:#999">Belum ada kampung. Generate form progres terlebih dahulu.</p>'; $("docContent").innerHTML = ''; return; }
+    if (S.docV < 0) S.docV = 0;
+    if (S.docV >= vs.length) S.docV = Math.max(0, vs.length - 1);
     let navHTML = vs.map((x,i) => `<button class="pill ${S.docMode==='kampung'&&i===S.docV?'active':''}" onclick="S.docMode='kampung';S.docV=${i};renderDokumentasi()">${i+1}. ${esc(x.name)}</button>`).join('');
     navHTML += `<button class="pill ${S.docMode==='perahu'?'active':''}" onclick="S.docMode='perahu';renderDokumentasi()" style="background:#0C3B63;color:white;font-weight:bold;">🚤 Perahu</button>`;
     $("docNav").innerHTML = navHTML;
@@ -721,8 +724,8 @@ function generateNarrativeTable() {
                 out += `<li>Tim melanjutkan kegiatan pendataan door to door pada wilayah tugas masing-masing.</li>`;
             }
             if (!isFirstDayOfFirstKampung) {
-                let items = S.p[v.name][d].items;
-                if (items && Object.keys(items).length > 0) {
+                let items = (S.p[v.name] && S.p[v.name][d] && S.p[v.name][d].items) || {};
+                if (Object.keys(items).length > 0) {
                     Object.values(items).forEach(x => {
                         let a = +x.assignment||0, b = +x.bku||0, k = +x.keluarga||0, bl = +x.bangunan||0, u = +x.usaha||0;
                         if (!a && !b && !k && !bl && !u && !x.notes) {
@@ -802,7 +805,7 @@ function preview(){
     } catch(err){ console.error(err); alert("Error saat Preview."); }
 }
 
-// ===================== DOWNLOAD WORD (TANPA UPLOAD) =====================
+// ===================== DOWNLOAD WORD =====================
 function word(){
     try {
         if(validate()){alert(validate());return;}
@@ -851,10 +854,9 @@ function generateOfflineWord(resizedImages){
     }
 }
 
-// ===================== SAVE & LOAD (DIPERBAIKI) =====================
+// ===================== SAVE & LOAD =====================
 function save(){
     try {
-        // Ambil data dari form
         S.petugas = S.petugas.map(p => p.trim()).filter(Boolean);
         if (S.petugas.length === 0) S.petugas = [''];
         S.tujuan = document.getElementById('tujuan').value.trim();
@@ -863,7 +865,6 @@ function save(){
         S.perihal = document.getElementById('perihal').value.trim();
         S.nomorSurat = document.getElementById('nomorSurat').value.trim();
         
-        // Simpan ke localStorage
         localStorage.setItem("laporanGenerator", JSON.stringify(S));
         $("status").innerHTML = '<div class="status">✅ Data tersimpan di browser.</div>';
         renderPetugas();
@@ -883,7 +884,6 @@ function load(){
         let data = JSON.parse(x);
         Object.assign(S, data);
         
-        // Render ulang semua komponen
         document.getElementById('tujuan').value = S.tujuan || "";
         if (S.tanggalAwal) {
             let parts = S.tanggalAwal.split('/');
@@ -922,115 +922,110 @@ function load(){
 
 function resetAll(){ if(confirm("⚠️ Yakin ingin menghapus SEMUA data?")){ localStorage.removeItem("laporanGenerator"); location.reload(); } }
 
-// ===================== LEGACY CSV PARSER (DIPERBAIKI) =====================
+// ===================== PARSER CSV (DELIMITER AUTO) =====================
+function detectDelimiter(line) {
+    if (line.includes('\t')) return '\t';
+    return ',';
+}
 function parseCSVLine(line) {
+    // Hapus BOM jika ada
+    if (line.charCodeAt(0) === 0xFEFF) line = line.slice(1);
+    const delimiter = detectDelimiter(line);
     let result=[], current='', inside=false;
     for(let i=0; i<line.length; i++){
         let char=line[i];
         if(char==='"'){ if(inside&&line[i+1]==='"'){ current+='"'; i++; } else inside=!inside; }
-        else if(char===','&&!inside){ result.push(current.trim()); current=''; }
+        else if(char===delimiter&&!inside){ result.push(current.trim()); current=''; }
         else current+=char;
     }
     result.push(current.trim());
     return result;
 }
 
+// ===================== IMPORT LEGACY CSV =====================
 function importLegacyCSV(text) {
-    let lines = text.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim() !== '' && !l.trim().startsWith('#ERROR!'));
-    let section = '';
-    let petugasRaw = '', tujuanVal = '', tanggalAwalVal = '', tanggalAkhirVal = '', perihalVal = '', nomorSuratVal = '';
-    let kampungList = [], wilayahList = [], progressData = {}, photoData = {}, wordBackupData = [];
+    // Hapus BOM jika ada
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    let lines = text.split('\n')
+        .map(l => l.replace(/\r$/, ''))
+        .filter(l => {
+            const trimmed = l.trim();
+            return trimmed !== '' && !trimmed.startsWith('#') && !trimmed.startsWith('//') && !trimmed.includes('#ERROR!');
+        });
 
-    let wilayahHeader = null;
-    let progresHeader = null;
+    let section = '';
+    let petugasRaw = '', tujuanVal = '', tanggalAwalVal = '', tanggalAkhirVal = '',
+        perihalVal = '', nomorSuratVal = '';
+    let kampungList = [], wilayahList = [], progressData = {}, photoData = {}, wordBackupData = [];
+    let wilayahHeader = null, progresHeader = null;
 
     for (let i = 0; i < lines.length; i++) {
         let line = lines[i].trim();
         if (line.startsWith('=== DATA UTAMA ===')) { section = 'utama'; continue; }
-        else if (line.startsWith('=== KAMPUNG TUJUAN ===')) { section = 'kampung'; continue; }
-        else if (line.startsWith('=== WILAYAH TUGAS ===')) { section = 'wilayah'; continue; }
-        else if (line.startsWith('=== DATA PROGRES ===')) { section = 'progres'; continue; }
-        else if (line.startsWith('=== DOKUMENTASI ===')) { section = 'dokumentasi'; continue; }
-        else if (line.startsWith('=== BACKUP WORD ===')) { section = 'backup'; continue; }
+        if (line.startsWith('=== KAMPUNG TUJUAN ===')) { section = 'kampung'; continue; }
+        if (line.startsWith('=== WILAYAH TUGAS ===')) { section = 'wilayah'; continue; }
+        if (line.startsWith('=== DATA PROGRES ===')) { section = 'progres'; continue; }
+        if (line.startsWith('=== DOKUMENTASI ===')) { section = 'dokumentasi'; continue; }
+        if (line.startsWith('=== BACKUP WORD ===')) { section = 'backup'; continue; }
+
+        let parts = parseCSVLine(line);
 
         if (section === 'utama') {
-            if (line.startsWith('Nama Petugas,')) petugasRaw = line.substring('Nama Petugas,'.length).trim();
-            else if (line.startsWith('Tujuan,')) tujuanVal = line.substring('Tujuan,'.length).trim();
-            else if (line.startsWith('Tanggal Awal,')) tanggalAwalVal = line.substring('Tanggal Awal,'.length).trim();
-            else if (line.startsWith('Tanggal Akhir,')) tanggalAkhirVal = line.substring('Tanggal Akhir,'.length).trim();
-            else if (line.startsWith('Perihal,')) perihalVal = line.substring('Perihal,'.length).trim();
-            else if (line.startsWith('Nomor Surat Tugas,')) nomorSuratVal = line.substring('Nomor Surat Tugas,'.length).trim();
+            if (parts[0] === 'Nama Petugas') petugasRaw = parts.slice(1).join(' ').trim();
+            else if (parts[0] === 'Tujuan') tujuanVal = parts.slice(1).join(' ').trim();
+            else if (parts[0] === 'Tanggal Awal') tanggalAwalVal = parts.slice(1).join(' ').trim();
+            else if (parts[0] === 'Tanggal Akhir') tanggalAkhirVal = parts.slice(1).join(' ').trim();
+            else if (parts[0] === 'Perihal') perihalVal = parts.slice(1).join(' ').trim();
+            else if (parts[0] === 'Nomor Surat Tugas') nomorSuratVal = parts.slice(1).join(' ').trim();
         }
         else if (section === 'kampung') {
-            let parts = parseCSVLine(line);
-            if (parts.length >= 4 && parts[0] && !parts[0].includes('Kampung')) {
-                kampungList.push({ kampung: parts[0], distrik: parts[1]||'', mengetahui: parts[2]||'', jabatan: parts[3]||'' });
+            if (parts.length >= 4 && parts[0] && parts[0].toLowerCase() !== 'kampung') {
+                kampungList.push({
+                    kampung: parts[0] || '',
+                    distrik: parts[1] || '',
+                    mengetahui: parts[2] || '',
+                    jabatan: parts[3] || ''
+                });
             }
         }
         else if (section === 'wilayah') {
             if (!wilayahHeader) {
-                let header = parseCSVLine(line);
-                if (header.length >= 10 && header[0] === 'Kampung') {
-                    wilayahHeader = header.map(h => h.trim());
+                if (parts.length >= 10 && parts[0].toLowerCase() === 'kampung') {
+                    wilayahHeader = parts.map(h => h.trim());
                     continue;
+                } else {
+                    continue; // lewati sampai header valid
                 }
             }
-            let parts = parseCSVLine(line);
             if (parts.length < 10) continue;
-            let idxKampung = wilayahHeader.indexOf('Kampung');
-            let idxSLS = wilayahHeader.indexOf('SLS');
-            let idxPPL = wilayahHeader.indexOf('Nama PPL') !== -1 ? wilayahHeader.indexOf('Nama PPL') : wilayahHeader.indexOf('PPL');
-            let idxTglAwal = wilayahHeader.indexOf('Tanggal Awal');
-            let idxTglAkhir = wilayahHeader.indexOf('Tanggal Akhir');
-            let idxAssign = wilayahHeader.indexOf('AssignmentTotal');
-            let idxBKU = wilayahHeader.indexOf('BKUTotal');
-            let idxKeluarga = wilayahHeader.indexOf('KeluargaTotal');
-            let idxBangunan = wilayahHeader.indexOf('BangunanTotal');
-            let idxUsaha = wilayahHeader.indexOf('UsahaTotal');
 
-            if (idxKampung === -1) idxKampung = 0;
-            if (idxSLS === -1) idxSLS = 1;
-            if (idxPPL === -1) idxPPL = 2;
-            if (idxTglAwal === -1) idxTglAwal = 3;
-            if (idxTglAkhir === -1) idxTglAkhir = 4;
-            if (idxAssign === -1) idxAssign = 5;
-            if (idxBKU === -1) idxBKU = 6;
-            if (idxKeluarga === -1) idxKeluarga = 7;
-            if (idxBangunan === -1) idxBangunan = 8;
-            if (idxUsaha === -1) idxUsaha = 9;
+            const getVal = (arr, idx, def = '') => (idx >= 0 && idx < arr.length) ? arr[idx] : def;
+            const idxKampung = wilayahHeader.indexOf('Kampung') !== -1 ? wilayahHeader.indexOf('Kampung') : 0;
+            const idxSLS = wilayahHeader.indexOf('SLS') !== -1 ? wilayahHeader.indexOf('SLS') : 1;
+            const idxPPL = (wilayahHeader.indexOf('Nama PPL') !== -1 ? wilayahHeader.indexOf('Nama PPL') : wilayahHeader.indexOf('PPL'));
+            const idxTglAwal = wilayahHeader.indexOf('Tanggal Awal');
+            const idxTglAkhir = wilayahHeader.indexOf('Tanggal Akhir');
+            const idxAssign = wilayahHeader.indexOf('AssignmentTotal');
+            const idxBKU = wilayahHeader.indexOf('BKUTotal');
+            const idxKeluarga = wilayahHeader.indexOf('KeluargaTotal');
+            const idxBangunan = wilayahHeader.indexOf('BangunanTotal');
+            const idxUsaha = wilayahHeader.indexOf('UsahaTotal');
 
-            let kampung = parts[idxKampung] || '';
-            let sls = parts[idxSLS] || '';
-            let ppl = parts[idxPPL] || '';
-            let start = parts[idxTglAwal] || '';
-            let end = parts[idxTglAkhir] || '';
-            let assign = parseInt(parts[idxAssign]) || 0;
-            let bku = parseInt(parts[idxBKU]) || 0;
-            let keluarga = parseInt(parts[idxKeluarga]) || 0;
-            let bangunan = parseInt(parts[idxBangunan]) || 0;
-            let usaha = parseInt(parts[idxUsaha]) || 0;
-
-            if (!start && idxTglAwal < parts.length - 1) {
-                for (let j = idxTglAwal; j < parts.length; j++) {
-                    if (parts[j] && parts[j].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
-                        start = parts[j];
-                        if (j+1 < parts.length && parts[j+1].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
-                            end = parts[j+1];
-                            if (j+2 < parts.length) assign = parseInt(parts[j+2]) || 0;
-                            if (j+3 < parts.length) bku = parseInt(parts[j+3]) || 0;
-                            if (j+4 < parts.length) keluarga = parseInt(parts[j+4]) || 0;
-                            if (j+5 < parts.length) bangunan = parseInt(parts[j+5]) || 0;
-                            if (j+6 < parts.length) usaha = parseInt(parts[j+6]) || 0;
-                        }
-                        break;
-                    }
-                }
-            }
+            let kampung = getVal(parts, idxKampung);
+            let sls = getVal(parts, idxSLS);
+            let ppl = getVal(parts, idxPPL !== -1 ? idxPPL : 2);
+            let start = getVal(parts, idxTglAwal !== -1 ? idxTglAwal : 3);
+            let end = getVal(parts, idxTglAkhir !== -1 ? idxTglAkhir : 4);
+            let assign = parseInt(getVal(parts, idxAssign !== -1 ? idxAssign : 5)) || 0;
+            let bku = parseInt(getVal(parts, idxBKU !== -1 ? idxBKU : 6)) || 0;
+            let keluarga = parseInt(getVal(parts, idxKeluarga !== -1 ? idxKeluarga : 7)) || 0;
+            let bangunan = parseInt(getVal(parts, idxBangunan !== -1 ? idxBangunan : 8)) || 0;
+            let usaha = parseInt(getVal(parts, idxUsaha !== -1 ? idxUsaha : 9)) || 0;
 
             if (kampung && sls && ppl && start && end) {
                 wilayahList.push({
                     kampung, sls, ppl,
-                    start: parseDateFromCSV(start),
+                    start: parseDateFromCSV(start), // mm/dd/yyyy -> dd/mm/yyyy
                     end: parseDateFromCSV(end),
                     assignmentTotal: assign, bkuTotal: bku, keluargaTotal: keluarga,
                     bangunanTotal: bangunan, usahaTotal: usaha
@@ -1039,46 +1034,37 @@ function importLegacyCSV(text) {
         }
         else if (section === 'progres') {
             if (!progresHeader) {
-                let header = parseCSVLine(line);
-                if (header.length >= 10 && header[0] === 'Kampung') {
-                    progresHeader = header.map(h => h.trim());
+                if (parts.length >= 10 && parts[0].toLowerCase() === 'kampung') {
+                    progresHeader = parts.map(h => h.trim());
+                    continue;
+                } else {
                     continue;
                 }
             }
-            let parts = parseCSVLine(line);
             if (parts.length < 10) continue;
-            let idxKampung = progresHeader.indexOf('Kampung');
-            let idxTanggal = progresHeader.indexOf('Tanggal');
-            let idxSLS = progresHeader.indexOf('SLS');
-            let idxPPL = progresHeader.indexOf('PPL');
-            let idxAssign = progresHeader.indexOf('Assignment');
-            let idxBKU = progresHeader.indexOf('BKU');
-            let idxKeluarga = progresHeader.indexOf('Keluarga');
-            let idxBangunan = progresHeader.indexOf('Bangunan Lainnya');
-            let idxUsaha = progresHeader.indexOf('Usaha');
-            let idxCatatan = progresHeader.indexOf('Catatan SLS');
 
-            if (idxKampung === -1) idxKampung = 0;
-            if (idxTanggal === -1) idxTanggal = 1;
-            if (idxSLS === -1) idxSLS = 2;
-            if (idxPPL === -1) idxPPL = 3;
-            if (idxAssign === -1) idxAssign = 4;
-            if (idxBKU === -1) idxBKU = 5;
-            if (idxKeluarga === -1) idxKeluarga = 6;
-            if (idxBangunan === -1) idxBangunan = 7;
-            if (idxUsaha === -1) idxUsaha = 8;
-            if (idxCatatan === -1) idxCatatan = 9;
+            const getVal = (arr, idx, def = '') => (idx >= 0 && idx < arr.length) ? arr[idx] : def;
+            const idxKampung = progresHeader.indexOf('Kampung') !== -1 ? progresHeader.indexOf('Kampung') : 0;
+            const idxTanggal = progresHeader.indexOf('Tanggal') !== -1 ? progresHeader.indexOf('Tanggal') : 1;
+            const idxSLS = progresHeader.indexOf('SLS') !== -1 ? progresHeader.indexOf('SLS') : 2;
+            const idxPPL = progresHeader.indexOf('PPL') !== -1 ? progresHeader.indexOf('PPL') : 3;
+            const idxAssign = progresHeader.indexOf('Assignment') !== -1 ? progresHeader.indexOf('Assignment') : 4;
+            const idxBKU = progresHeader.indexOf('BKU') !== -1 ? progresHeader.indexOf('BKU') : 5;
+            const idxKeluarga = progresHeader.indexOf('Keluarga') !== -1 ? progresHeader.indexOf('Keluarga') : 6;
+            const idxBangunan = progresHeader.indexOf('Bangunan Lainnya') !== -1 ? progresHeader.indexOf('Bangunan Lainnya') : 7;
+            const idxUsaha = progresHeader.indexOf('Usaha') !== -1 ? progresHeader.indexOf('Usaha') : 8;
+            const idxCatatan = progresHeader.indexOf('Catatan') !== -1 ? progresHeader.indexOf('Catatan') : 9;
 
-            let kampung = parts[idxKampung] || '';
-            let tanggal = parts[idxTanggal] || '';
-            let sls = parts[idxSLS] || '';
-            let ppl = parts[idxPPL] || '';
-            let assign = parts[idxAssign] || '0';
-            let bku = parts[idxBKU] || '0';
-            let keluarga = parts[idxKeluarga] || '0';
-            let bangunan = parts[idxBangunan] || '0';
-            let usaha = parts[idxUsaha] || '0';
-            let catatan = parts[idxCatatan] || '';
+            let kampung = getVal(parts, idxKampung);
+            let tanggal = getVal(parts, idxTanggal);
+            let sls = getVal(parts, idxSLS);
+            let ppl = getVal(parts, idxPPL);
+            let assign = getVal(parts, idxAssign, '0');
+            let bku = getVal(parts, idxBKU, '0');
+            let keluarga = getVal(parts, idxKeluarga, '0');
+            let bangunan = getVal(parts, idxBangunan, '0');
+            let usaha = getVal(parts, idxUsaha, '0');
+            let catatan = getVal(parts, idxCatatan);
 
             if (!kampung || !tanggal) continue;
             let parsedTanggal = parseDateFromCSV(tanggal);
@@ -1087,12 +1073,15 @@ function importLegacyCSV(text) {
             if (!progressData[kampung]) progressData[kampung] = {};
             if (!progressData[kampung][parsedTanggal]) progressData[kampung][parsedTanggal] = { notes: "", items: {} };
             let key = sls + '||' + ppl;
-            progressData[kampung][parsedTanggal].items[key] = { sls, ppl, assignment: assign, bku, keluarga, bangunan, usaha, notes: catatan };
+            progressData[kampung][parsedTanggal].items[key] = {
+                sls, ppl,
+                assignment: assign, bku, keluarga, bangunan, usaha,
+                notes: catatan
+            };
         }
         else if (section === 'dokumentasi') {
-            let parts = parseCSVLine(line);
-            if (parts.length >= 3 && parts[0] && !parts[0].includes('Kampung')) {
-                let kampung = parts[0];
+            if (parts.length >= 3 && parts[0] && parts[0].toLowerCase() !== 'kampung') {
+                let kampung = parts[0] || '';
                 let src = parts[1] || '';
                 let caption = parts[2] || '';
                 if (src && src.startsWith('http')) {
@@ -1102,13 +1091,18 @@ function importLegacyCSV(text) {
             }
         }
         else if (section === 'backup') {
-            let parts = parseCSVLine(line);
-            if (parts.length >= 4 && parts[0] && !parts[0].includes('Nama_File')) {
-                wordBackupData.push({ name: parts[0], file: parts[1], date: parts[2]||'', createdBy: parts[3]||'' });
+            if (parts.length >= 4 && parts[0] && parts[0].toLowerCase() !== 'nama_file') {
+                wordBackupData.push({
+                    name: parts[0] || '',
+                    file: parts[1] || '',
+                    date: parts[2] || '',
+                    createdBy: parts[3] || ''
+                });
             }
         }
     }
 
+    // Terapkan hasil import
     let petugasList = petugasRaw ? petugasRaw.split(';').map(p => p.trim()).filter(Boolean) : [''];
     if (petugasList.length === 0) petugasList = [''];
     S.petugas = petugasList;
@@ -1159,7 +1153,7 @@ function exportExcel() {
             S.wilayah.forEach(w=>wilayahData.push([w.kampung||'',w.sls||'',w.ppl||'',w.start||'',w.end||'',w.assignmentTotal||0,w.bkuTotal||0,w.keluargaTotal||0,w.bangunanTotal||0,w.usahaTotal||0]));
             let wsWilayah = XLSX.utils.aoa_to_sheet(wilayahData); XLSX.utils.book_append_sheet(wb, wsWilayah, "WILAYAH");
             let progresData = [["Kampung","Tanggal","SLS","PPL","Assignment","BKU","Keluarga","Bangunan Lainnya","Usaha","Catatan"]];
-            let vs=group(); vs.forEach(v=>{ let ds=Object.keys(S.p[v.name]||{}).sort((a,b)=>toDateObj(a)-toDateObj(b)); ds.forEach(d=>{ let items=S.p[v.name][d].items||{}; Object.values(items).forEach(x=>{ progresData.push([v.name,d,x.sls||'',x.ppl||'',x.assignment||'0',x.bku||'0',x.keluarga||'0',x.bangunan||'0',x.usaha||'0',x.notes||'']); }); }); });
+            let vs=group(); vs.forEach(v=>{ let ds=Object.keys(S.p[v.name]||{}).sort((a,b)=>toDateObj(a)-toDateObj(b)); ds.forEach(d=>{ let items=(S.p[v.name]&&S.p[v.name][d]&&S.p[v.name][d].items)||{}; Object.values(items).forEach(x=>{ progresData.push([v.name,d,x.sls||'',x.ppl||'',x.assignment||'0',x.bku||'0',x.keluarga||'0',x.bangunan||'0',x.usaha||'0',x.notes||'']); }); }); });
             if(progresData.length>1){ let wsProgres = XLSX.utils.aoa_to_sheet(progresData); XLSX.utils.book_append_sheet(wb, wsProgres, "PROGRES"); }
             let dokumenData = [["Kampung","Cloudinary_URL","Caption"]]; vs.forEach(v=>{ let photos=S.photos[v.name]||[]; photos.forEach(p=>{ if(p.src) dokumenData.push([v.name,p.src,p.caption||'']); }); }); let perahuPhotos=S.photos["Perahu"]||[]; perahuPhotos.forEach(p=>{ if(p.src) dokumenData.push(["Perahu",p.src,p.caption||'']); });
             let wsDokumen = XLSX.utils.aoa_to_sheet(dokumenData); XLSX.utils.book_append_sheet(wb, wsDokumen, "DOKUMENTASI");
@@ -1175,7 +1169,95 @@ function exportExcel() {
     fallbackExportCSV();
 }
 function fallbackExportCSV() {
-    // ... (sama seperti sebelumnya)
+    function toCSVDate(dd_mm_yyyy) {
+        if (!dd_mm_yyyy) return '';
+        let parts = dd_mm_yyyy.split('/');
+        if (parts.length !== 3) return dd_mm_yyyy;
+        return `${parts[1]}/${parts[0]}/${parts[2]}`;
+    }
+
+    const rows = [];
+    rows.push(['Nama Petugas', 'Tujuan', 'Tanggal Awal', 'Tanggal Akhir', 'Perihal', 'Nomor Surat Tugas']);
+    rows.push([
+        S.petugas.filter(p => p.trim()).join('; '),
+        S.tujuan,
+        toCSVDate(S.tanggalAwal),
+        toCSVDate(S.tanggalAkhir),
+        S.perihal,
+        S.nomorSurat
+    ]);
+    rows.push([]);
+
+    rows.push(['Kampung', 'Distrik', 'Mengetahui', 'Jabatan']);
+    S.kampung.forEach(k => rows.push([k.kampung, k.distrik, k.mengetahui, k.jabatan]));
+    rows.push([]);
+
+    rows.push(['Kampung', 'SLS', 'PPL', 'Tanggal Awal', 'Tanggal Akhir', 'AssignmentTotal', 'BKUTotal', 'KeluargaTotal', 'BangunanTotal', 'UsahaTotal']);
+    S.wilayah.forEach(w => rows.push([
+        w.kampung,
+        w.sls,
+        w.ppl,
+        toCSVDate(w.start),
+        toCSVDate(w.end),
+        w.assignmentTotal || 0,
+        w.bkuTotal || 0,
+        w.keluargaTotal || 0,
+        w.bangunanTotal || 0,
+        w.usahaTotal || 0
+    ]));
+    rows.push([]);
+
+    rows.push(['Kampung', 'Tanggal', 'SLS', 'PPL', 'Assignment', 'BKU', 'Keluarga', 'Bangunan Lainnya', 'Usaha', 'Catatan']);
+    const vs = group();
+    vs.forEach(v => {
+        const ds = Object.keys(S.p[v.name] || {}).sort((a, b) => toDateObj(a) - toDateObj(b));
+        ds.forEach(d => {
+            const items = (S.p[v.name] && S.p[v.name][d] && S.p[v.name][d].items) || {};
+            Object.values(items).forEach(x => {
+                rows.push([
+                    v.name,
+                    toCSVDate(d),
+                    x.sls || '',
+                    x.ppl || '',
+                    x.assignment || '0',
+                    x.bku || '0',
+                    x.keluarga || '0',
+                    x.bangunan || '0',
+                    x.usaha || '0',
+                    x.notes || ''
+                ]);
+            });
+        });
+    });
+    rows.push([]);
+
+    rows.push(['Kampung', 'Cloudinary_URL', 'Caption']);
+    vs.forEach(v => {
+        const photos = S.photos[v.name] || [];
+        photos.forEach(p => {
+            if (p.src) rows.push([v.name, p.src, p.caption || '']);
+        });
+    });
+    const perahuPhotos = S.photos['Perahu'] || [];
+    perahuPhotos.forEach(p => {
+        if (p.src) rows.push(['Perahu', p.src, p.caption || '']);
+    });
+    rows.push([]);
+
+    rows.push(['Nama_File', 'URL', 'Tanggal', 'Dibuat_Oleh']);
+    if (S.wordBackupUrl && S.wordBackupUrl.length) {
+        S.wordBackupUrl.forEach(w => rows.push([w.name || '', w.file || '', w.date || '', w.createdBy || '']));
+    } else {
+        rows.push(['Belum ada backup', '', '', '']);
+    }
+
+    const csv = rows.map(row =>
+        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    downloadFile(blob, generateFileName('csv'));
+    $("status").innerHTML = '<div class="status">✅ Backup CSV berhasil diunduh!</div>';
 }
 
 // ===================== IMPORT EXCEL =====================
@@ -1308,4 +1390,4 @@ renderWilayah();
 renderDokumentasi();
 </script>
 </body>
-    </html>
+        </html>
