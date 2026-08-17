@@ -287,8 +287,10 @@ const S = {
 const $ = id => document.getElementById(id);
 const esc = x => String(x ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 
-// ===================== FUNGSI TANGGAL =====================
-// System Core: dd/mm/yyyy
+// ===================== FUNGSI TANGGAL (INTI SISTEM: dd/mm/yyyy) =====================
+
+// System Core membaca mutlak bagian pertama sebagai HARI (dd/mm/yyyy)
+// dengan fallback ke mm/dd/yyyy jika gagal
 function toDateObj(dateStr) {
     if (!dateStr) return null;
     let s = dateStr.trim();
@@ -311,6 +313,7 @@ function toDateObj(dateStr) {
     return null;
 }
 
+// System Core mengeluarkan string mutlak format HARI/BULAN/TAHUN (dd/mm/yyyy)
 function formatDateObj(d) {
     if (!d) return "";
     let day = String(d.getDate()).padStart(2, '0');
@@ -363,30 +366,31 @@ function validateDateFormat(input) {
     }
 }
 
-// JEMBATAN ADAPTASI CSV: coba mm/dd/yyyy, jika gagal coba dd/mm/yyyy
+// JEMBATAN ADAPTASI CSV: coba dd/mm/yyyy terlebih dahulu, jika gagal baru mm/dd/yyyy
 function parseDateFromCSV(dateStr) {
     if (!dateStr) return '';
     let s = dateStr.trim();
     let parts = s.split('/');
     if (parts.length !== 3) return s;
+    
     let first = parseInt(parts[0], 10);
     let second = parseInt(parts[1], 10);
     let year = parseInt(parts[2], 10);
     if (isNaN(first) || isNaN(second) || isNaN(year)) return s;
 
-    // Coba format mm/dd/yyyy (default CSV)
-    let month = first - 1;
-    let day = second;
+    // Coba format dd/mm/yyyy (format cadangan yang benar)
+    let day = first;
+    let month = second - 1;
     let date = new Date(year, month, day);
-    if (!isNaN(date.getTime()) && date.getMonth() === month && date.getDate() === day && date.getFullYear() === year) {
+    if (!isNaN(date.getTime()) && date.getDate() === day && date.getMonth() === month && date.getFullYear() === year) {
         return formatDateObj(date);
     }
 
-    // Jika gagal, coba format dd/mm/yyyy
-    month = second - 1;
-    day = first;
+    // Fallback: coba format mm/dd/yyyy
+    month = first - 1;
+    day = second;
     date = new Date(year, month, day);
-    if (!isNaN(date.getTime()) && date.getMonth() === month && date.getDate() === day && date.getFullYear() === year) {
+    if (!isNaN(date.getTime()) && date.getDate() === day && date.getMonth() === month && date.getFullYear() === year) {
         return formatDateObj(date);
     }
 
@@ -1432,4 +1436,4 @@ renderWilayah();
 renderDokumentasi();
 </script>
 </body>
-    </html>
+                                                                                      </html>
