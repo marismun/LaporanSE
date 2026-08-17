@@ -287,21 +287,25 @@ const S = {
 const $ = id => document.getElementById(id);
 const esc = x => String(x ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 
-// ===================== FUNGSI TANGGAL =====================
+// ===================== FUNGSI TANGGAL (INTI SISTEM: dd/mm/yyyy) =====================
+
+// System Core membaca mutlak bagian pertama sebagai HARI (dd/mm/yyyy)
 function toDateObj(dateStr) {
     if (!dateStr) return null;
     let s = dateStr.trim();
     let parts = s.split('/');
     if (parts.length !== 3) return null;
-    let d = parseInt(parts[0], 10);
-    let m = parseInt(parts[1], 10) - 1;
-    let y = parseInt(parts[2], 10);
+    let d = parseInt(parts[0], 10); // HARI
+    let m = parseInt(parts[1], 10) - 1; // BULAN
+    let y = parseInt(parts[2], 10); // TAHUN
     let date = new Date(y, m, d);
     if (!isNaN(date.getTime()) && date.getDate() === d && date.getMonth() === m && date.getFullYear() === y) {
         return date;
     }
     return null;
 }
+
+// System Core mengeluarkan string mutlak format HARI/BULAN/TAHUN (dd/mm/yyyy)
 function formatDateObj(d) {
     if (!d) return "";
     let day = String(d.getDate()).padStart(2, '0');
@@ -309,6 +313,7 @@ function formatDateObj(d) {
     let year = d.getFullYear();
     return `${day}/${month}/${year}`;
 }
+
 function dates(startStr, endStr) {
     let start = toDateObj(startStr);
     let end = toDateObj(endStr);
@@ -353,29 +358,26 @@ function validateDateFormat(input) {
     }
 }
 
-// STRICT PARSING: Membaca mutlak format Bulan/Hari/Tahun (m/d/yyyy, mm/dd/yyyy, dll) dengan delimiter '/'
+// JEMBATAN ADAPTASI KHUSUS CSV: Membaca m/d/yyyy -> Mengeluarkan dd/mm/yyyy
 function parseDateFromCSV(dateStr) {
     if (!dateStr) return '';
     let s = dateStr.trim();
     
-    // Pecah hanya menggunakan garis miring (/)
+    // Pecah berdasarkan garis miring
     let parts = s.split('/');
     if (parts.length !== 3) return s;
     
-    // Berapapun digitnya (contoh: '7' atau '07'), parseInt akan menjadikannya angka yang benar.
-    // parts[0] = Bulan (0-indexed di JS, jadi dikurangi 1)
-    // parts[1] = Hari
-    // parts[2] = Tahun
-    let month = parseInt(parts[0], 10) - 1; 
-    let day = parseInt(parts[1], 10);
-    let year = parseInt(parts[2], 10);
+    // Baca mutlak sebagai mm/dd/yyyy khusus untuk fungsi import ini
+    let month = parseInt(parts[0], 10) - 1; // Bagian 1 adalah BULAN
+    let day = parseInt(parts[1], 10);       // Bagian 2 adalah HARI
+    let year = parseInt(parts[2], 10);      // Bagian 3 adalah TAHUN
     
     if (isNaN(month) || isNaN(day) || isNaN(year)) return s;
     
     let d = new Date(year, month, day);
     if (isNaN(d.getTime())) return s;
     
-    // Kembalikan ke dalam format string dd/mm/yyyy untuk isian (input fields)
+    // Kembalikan hasilnya menggunakan formatDateObj (dd/mm/yyyy) agar selaras dengan seluruh sistem
     return formatDateObj(d);
 }
 
@@ -945,7 +947,6 @@ function detectDelimiter(line) {
 }
 
 function parseCSVLine(line) {
-    // Hapus BOM jika ada
     if (line.charCodeAt(0) === 0xFEFF) line = line.slice(1);
     const delimiter = detectDelimiter(line);
     let result=[], current='', inside=false;
@@ -964,13 +965,11 @@ function parseCSVLine(line) {
 
 // ===================== IMPORT LEGACY CSV (Auto-Detect Header) =====================
 function importLegacyCSV(text) {
-    // Hapus BOM jika ada
     if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
     let lines = text.split('\n')
         .map(l => l.replace(/\r$/, ''))
         .filter(l => {
             const trimmed = l.trim();
-            // Abaikan komentar, biarkan baris koma kosong lolos agar bisa di-reset
             return trimmed !== '' && !trimmed.startsWith('#') && !trimmed.startsWith('//');
         });
 
@@ -983,7 +982,6 @@ function importLegacyCSV(text) {
     for (let i = 0; i < lines.length; i++) {
         let line = lines[i].trim();
         
-        // Skip baris #ERROR! dari Excel
         if (line.includes('#ERROR!')) continue;
         
         if (line.startsWith('===')) {
@@ -998,13 +996,11 @@ function importLegacyCSV(text) {
 
         let parts = parseCSVLine(line);
 
-        // Jika baris hanya berisi koma (kosong), reset section
         if (parts.every(p => p === '')) {
             section = '';
             continue;
         }
 
-        // UNIVERSAL HEADER DETECTION
         let p0 = parts[0] ? parts[0].toLowerCase() : '';
         let p1 = parts[1] ? parts[1].toLowerCase() : '';
         
@@ -1022,26 +1018,13 @@ function importLegacyCSV(text) {
             section = 'utama';
         }
 
-        // PROSES SESUAI SECTION
         if (section === 'utama') {
-            if (p0 === 'nama petugas') {
-                petugasRaw = parts.slice(1).filter(Boolean).join(' ').trim();
-            }
-            else if (p0 === 'tujuan') {
-                tujuanVal = parts.slice(1).filter(Boolean).join(', ').trim();
-            }
-            else if (p0 === 'tanggal awal') {
-                tanggalAwalVal = parts.slice(1).filter(Boolean).join('').trim();
-            }
-            else if (p0 === 'tanggal akhir') {
-                tanggalAkhirVal = parts.slice(1).filter(Boolean).join('').trim();
-            }
-            else if (p0 === 'perihal') {
-                perihalVal = parts.slice(1).filter(Boolean).join(' ').trim();
-            }
-            else if (p0 === 'nomor surat tugas') {
-                nomorSuratVal = parts.slice(1).filter(Boolean).join(' ').trim();
-            }
+            if (p0 === 'nama petugas') petugasRaw = parts.slice(1).filter(Boolean).join(' ').trim();
+            else if (p0 === 'tujuan') tujuanVal = parts.slice(1).filter(Boolean).join(', ').trim();
+            else if (p0 === 'tanggal awal') tanggalAwalVal = parts.slice(1).filter(Boolean).join('').trim();
+            else if (p0 === 'tanggal akhir') tanggalAkhirVal = parts.slice(1).filter(Boolean).join('').trim();
+            else if (p0 === 'perihal') perihalVal = parts.slice(1).filter(Boolean).join(' ').trim();
+            else if (p0 === 'nomor surat tugas') nomorSuratVal = parts.slice(1).filter(Boolean).join(' ').trim();
         }
         else if (section === 'kampung') {
             if (parts[0] && p0 !== 'kampung') {
@@ -1077,8 +1060,8 @@ function importLegacyCSV(text) {
                 if (kampung && sls && ppl && start && end) {
                     wilayahList.push({
                         kampung, sls, ppl,
-                        start: parseDateFromCSV(start),
-                        end: parseDateFromCSV(end),
+                        start: parseDateFromCSV(start), // JEMBATAN IMPORT mm/dd/yyyy -> dd/mm/yyyy
+                        end: parseDateFromCSV(end),     // JEMBATAN IMPORT mm/dd/yyyy -> dd/mm/yyyy
                         assignmentTotal: parseInt(getVal(parts, idxAssign !== -1 ? idxAssign : 5)) || 0,
                         bkuTotal: parseInt(getVal(parts, idxBKU !== -1 ? idxBKU : 6)) || 0,
                         keluargaTotal: parseInt(getVal(parts, idxKeluarga !== -1 ? idxKeluarga : 7)) || 0,
@@ -1105,7 +1088,7 @@ function importLegacyCSV(text) {
 
                 let kampung = getVal(parts, idxKampung);
                 let tanggal = getVal(parts, idxTanggal);
-                let parsedTanggal = parseDateFromCSV(tanggal);
+                let parsedTanggal = parseDateFromCSV(tanggal); // JEMBATAN IMPORT
 
                 if (kampung && parsedTanggal) {
                     if (!progressData[kampung]) progressData[kampung] = {};
@@ -1150,12 +1133,11 @@ function importLegacyCSV(text) {
         }
     }
 
-    // Terapkan hasil import
     let petugasList = petugasRaw ? petugasRaw.split(';').map(p => p.trim()).filter(Boolean) : [''];
     if (petugasList.length > 0) S.petugas = petugasList;
     if (tujuanVal) S.tujuan = tujuanVal;
-    if (tanggalAwalVal) S.tanggalAwal = parseDateFromCSV(tanggalAwalVal);
-    if (tanggalAkhirVal) S.tanggalAkhir = parseDateFromCSV(tanggalAkhirVal);
+    if (tanggalAwalVal) S.tanggalAwal = parseDateFromCSV(tanggalAwalVal); // JEMBATAN IMPORT
+    if (tanggalAkhirVal) S.tanggalAkhir = parseDateFromCSV(tanggalAkhirVal); // JEMBATAN IMPORT
     if (perihalVal) S.perihal = perihalVal;
     if (nomorSuratVal) S.nomorSurat = nomorSuratVal;
     if (kampungList.length) S.kampung = kampungList;
@@ -1197,7 +1179,7 @@ function exportExcel() {
             let kampungData = [["Kampung","Distrik","Mengetahui","Jabatan"]]; S.kampung.forEach(k=>kampungData.push([k.kampung||'',k.distrik||'',k.mengetahui||'',k.jabatan||'']));
             let wsKampung = XLSX.utils.aoa_to_sheet(kampungData); XLSX.utils.book_append_sheet(wb, wsKampung, "KAMPUNG");
             let wilayahData = [["Kampung","SLS","PPL","Tanggal Awal","Tanggal Akhir","AssignmentTotal","BKUTotal","KeluargaTotal","BangunanTotal","UsahaTotal"]];
-            S.wilayah.forEach(w=>wilayahData.push([w.kampung||'',w.sls||'',w.ppl||'',w.start||'',w.end||'',w.assignmentTotal||0,w.bkuTotal||0,w.keluargaTotal||0,w.bangunanTotal||0,w.usahaTotal||0]));
+            S.wilayah.forEach(w=>wilayahData.push([w.kampung||'',w.sls||'',w.ppl||'',w.start||'',w.end||'',w.assignmentTotal||0,w.bkuTotal||0,w.kelrabatTotal||0,w.bangunanTotal||0,w.usahaTotal||0]));
             let wsWilayah = XLSX.utils.aoa_to_sheet(wilayahData); XLSX.utils.book_append_sheet(wb, wsWilayah, "WILAYAH");
             let progresData = [["Kampung","Tanggal","SLS","PPL","Assignment","BKU","Keluarga","Bangunan Lainnya","Usaha","Catatan"]];
             let vs=group(); vs.forEach(v=>{ let ds=Object.keys(S.p[v.name]||{}).sort((a,b)=>toDateObj(a)-toDateObj(b)); ds.forEach(d=>{ let items=(S.p[v.name]&&S.p[v.name][d]&&S.p[v.name][d].items)||{}; Object.values(items).forEach(x=>{ progresData.push([v.name,d,x.sls||'',x.ppl||'',x.assignment||'0',x.bku||'0',x.keluarga||'0',x.bangunan||'0',x.usaha||'0',x.notes||'']); }); }); });
@@ -1216,12 +1198,12 @@ function exportExcel() {
     fallbackExportCSV();
 }
 function fallbackExportCSV() {
-    // Di file CSV asli, data diekspor sebagai mm/dd/yyyy
+    // JEMBATAN EXPORT: Mengubah dd/mm/yyyy milik sistem menjadi mm/dd/yyyy khusus untuk file CSV ini
     function toCSVDate(dd_mm_yyyy) {
         if (!dd_mm_yyyy) return '';
         let parts = dd_mm_yyyy.split('/');
         if (parts.length !== 3) return dd_mm_yyyy;
-        return `${parts[1]}/${parts[0]}/${parts[2]}`; // mm/dd/yyyy
+        return `${parts[1]}/${parts[0]}/${parts[2]}`; // Format dikembalikan menjadi mm/dd/yyyy (Bulan/Hari/Tahun)
     }
 
     const rows = [];
