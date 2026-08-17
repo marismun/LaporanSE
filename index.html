@@ -303,6 +303,7 @@ function toDateObj(dateStr) {
     return null;
 }
 function formatDateObj(d) {
+    if (!d) return ""; // Mencegah crash jika data tanggal kosong
     let day = String(d.getDate()).padStart(2, '0');
     let month = String(d.getMonth() + 1).padStart(2, '0');
     let year = d.getFullYear();
@@ -463,8 +464,11 @@ function renderWilayah() {
     S.wilayah.forEach((x,i) => {
         let kampungOpts = S.kampung.map(k => `<option value="${esc(k.kampung)}" ${k.kampung===x.kampung?'selected':''}>${esc(k.kampung)}</option>`).join('');
         let pplOpts = S.petugas.map(p => `<option value="${esc(p)}" ${p===x.ppl?'selected':''}>${esc(p)}</option>`).join('');
-        let startDisplay = formatDateObj(toDateObj(x.start)) || '';
-        let endDisplay = formatDateObj(toDateObj(x.end)) || '';
+        
+        // Membaca tanggal langsung dari object, menghindari format berulang yang menyebabkan crash jika kosong
+        let startDisplay = x.start || '';
+        let endDisplay = x.end || '';
+        
         html += `<div class="card">
             <div class="head"><b>Wilayah Tugas ${i+1}</b><button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="S.wilayah.splice(${i},1);renderWilayah()">Hapus</button></div>
             <div class="cols-5">
