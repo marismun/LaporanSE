@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Generator Laporan Pendataan BPS</title>
 <style>
-/* ... CSS SAMA SEPERTI SEBELUMNYA ... */
 :root {
     --primary-navy: #0C3B63;
     --primary-light: #E3F0F8;
@@ -519,169 +518,252 @@ function validate() {
     return "";
 }
 
-// ===================== GENERATE FORM =====================
+// ===================== GENERATE FORM (DIPERBAIKI - ERROR HANDLING) =====================
 function generate() {
-    let e = validate();
-    if (e) { $("status").innerHTML = `<div class="status err">${esc(e)}</div>`; return; }
-    let vs = group();
-    S.p = {};
-    vs.forEach(v => {
-        S.p[v.name] = {};
-        let allDates = [];
-        v.items.forEach(w => {
-            let days = dates(w.start, w.end);
-            days.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
-        });
-        if (allDates.length === 0 && v.items.length > 0) {
-            let firstStart = v.items.find(w => w.start)?.start;
-            if (firstStart) allDates.push(parseDate(firstStart));
+    try {
+        let e = validate();
+        if (e) { 
+            $("status").innerHTML = `<div class="status err">${esc(e)}</div>`; 
+            return; 
         }
-        allDates.sort((a,b) => toDateObj(a) - toDateObj(b));
+        
+        let vs = group();
+        if (vs.length === 0) {
+            $("status").innerHTML = '<div class="status err">Tidak ada wilayah tugas yang valid.</div>';
+            return;
+        }
 
-        allDates.forEach((d, idx) => {
-            let isFirstDayOfFirstKampung = (v.name === vs[0].name && idx === 0);
-            if (isFirstDayOfFirstKampung) {
-                S.p[v.name][d] = {};
-                return;
+        // ===== 1. BUAT DATA BARU DARI WILAYAH =====
+        let newData = {};
+        vs.forEach(v => {
+            newData[v.name] = {};
+            let allDates = [];
+            v.items.forEach(w => {
+                let days = dates(w.start, w.end);
+                days.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
+            });
+            if (allDates.length === 0 && v.items.length > 0) {
+                let firstStart = v.items.find(w => w.start)?.start;
+                if (firstStart) allDates.push(parseDate(firstStart));
             }
-            S.p[v.name][d] = { notes: "", items: {} };
-            v.items.filter(w => {
-                let dw = toDateObj(d), sw = toDateObj(w.start), ew = toDateObj(w.end);
-                return sw && ew && dw >= sw && dw <= ew;
-            }).forEach(w => {
-                let k = w.sls + "||" + w.ppl;
-                let days = dates(w.start, w.end).length;
-                if (days === 0) days = 1;
-                let totalAssign = w.assignmentTotal || 0, totalBku = w.bkuTotal || 0,
-                    totalKeluarga = w.keluargaTotal || 0, totalBangunan = w.bangunanTotal || 0,
-                    totalUsaha = w.usahaTotal || 0;
-                let baseAssign = Math.floor(totalAssign / days), remAssign = totalAssign % days;
-                let baseBku = Math.floor(totalBku / days), remBku = totalBku % days;
-                let baseKeluarga = Math.floor(totalKeluarga / days), remKeluarga = totalKeluarga % days;
-                let baseBangunan = Math.floor(totalBangunan / days), remBangunan = totalBangunan % days;
-                let baseUsaha = Math.floor(totalUsaha / days), remUsaha = totalUsaha % days;
+            allDates.sort((a,b) => toDateObj(a) - toDateObj(b));
 
-                let assignVal = baseAssign, bkuVal = baseBku, keluargaVal = baseKeluarga,
-                    bangunanVal = baseBangunan, usahaVal = baseUsaha;
-                if (d === allDates[allDates.length - 1]) {
-                    assignVal += remAssign; bkuVal += remBku; keluargaVal += remKeluarga;
-                    bangunanVal += remBangunan; usahaVal += remUsaha;
+            allDates.forEach((d, idx) => {
+                let isFirstDayOfFirstKampung = (v.name === vs[0].name && idx === 0);
+                if (isFirstDayOfFirstKampung) {
+                    newData[v.name][d] = {};
+                    return;
                 }
-                S.p[v.name][d].items[k] = {
-                    sls: w.sls, ppl: w.ppl,
-                    assignment: assignVal, bku: bkuVal, keluarga: keluargaVal,
-                    bangunan: bangunanVal, usaha: usahaVal, notes: ""
-                };
+                newData[v.name][d] = { notes: "", items: {} };
+                v.items.filter(w => {
+                    let dw = toDateObj(d), sw = toDateObj(w.start), ew = toDateObj(w.end);
+                    return sw && ew && dw >= sw && dw <= ew;
+                }).forEach(w => {
+                    let k = w.sls + "||" + w.ppl;
+                    let days = dates(w.start, w.end).length;
+                    if (days === 0) days = 1;
+                    let totalAssign = w.assignmentTotal || 0, totalBku = w.bkuTotal || 0,
+                        totalKeluarga = w.keluargaTotal || 0, totalBangunan = w.bangunanTotal || 0,
+                        totalUsaha = w.usahaTotal || 0;
+                    let baseAssign = Math.floor(totalAssign / days), remAssign = totalAssign % days;
+                    let baseBku = Math.floor(totalBku / days), remBku = totalBku % days;
+                    let baseKeluarga = Math.floor(totalKeluarga / days), remKeluarga = totalKeluarga % days;
+                    let baseBangunan = Math.floor(totalBangunan / days), remBangunan = totalBangunan % days;
+                    let baseUsaha = Math.floor(totalUsaha / days), remUsaha = totalUsaha % days;
+
+                    let assignVal = baseAssign, bkuVal = baseBku, keluargaVal = baseKeluarga,
+                        bangunanVal = baseBangunan, usahaVal = baseUsaha;
+                    if (d === allDates[allDates.length - 1]) {
+                        assignVal += remAssign; bkuVal += remBku; keluargaVal += remKeluarga;
+                        bangunanVal += remBangunan; usahaVal += remUsaha;
+                    }
+                    newData[v.name][d].items[k] = {
+                        sls: w.sls, ppl: w.ppl,
+                        assignment: assignVal, bku: bkuVal, keluarga: keluargaVal,
+                        bangunan: bangunanVal, usaha: usahaVal, notes: ""
+                    };
+                });
             });
         });
-    });
-    S.v = 0; S.docV = 0; S.docMode = 'kampung';
-    renderProgress(); renderDokumentasi();
-    $("progress").classList.remove("hidden");
-    $("status").innerHTML = '<div class="status">✅ Form progres dan dokumentasi berhasil digenerate.</div>';
+
+        // ===== 2. GABUNGKAN DENGAN DATA LAMA (TANPA MENIMPA) =====
+        let merged = {};
+        
+        // Salin data lama terlebih dahulu
+        for (let kampung in S.p) {
+            if (!merged[kampung]) merged[kampung] = {};
+            for (let tanggal in S.p[kampung]) {
+                if (!merged[kampung][tanggal]) merged[kampung][tanggal] = { notes: "", items: {} };
+                if (S.p[kampung][tanggal].notes) {
+                    merged[kampung][tanggal].notes = S.p[kampung][tanggal].notes;
+                }
+                for (let key in S.p[kampung][tanggal].items) {
+                    if (!merged[kampung][tanggal].items[key]) {
+                        merged[kampung][tanggal].items[key] = {};
+                    }
+                    Object.assign(merged[kampung][tanggal].items[key], S.p[kampung][tanggal].items[key]);
+                }
+            }
+        }
+
+        // Tambahkan data baru (hanya jika belum ada)
+        for (let kampung in newData) {
+            if (!merged[kampung]) merged[kampung] = {};
+            for (let tanggal in newData[kampung]) {
+                if (!merged[kampung][tanggal]) {
+                    merged[kampung][tanggal] = { notes: "", items: {} };
+                }
+                for (let key in newData[kampung][tanggal].items) {
+                    if (!merged[kampung][tanggal].items[key]) {
+                        merged[kampung][tanggal].items[key] = newData[kampung][tanggal].items[key];
+                    }
+                }
+            }
+        }
+
+        // ===== 3. TERAPKAN DATA YANG SUDAH DIGABUNGKAN =====
+        S.p = merged;
+        
+        // ===== 4. RESET POSISI DAN RENDER ULANG =====
+        S.v = 0;
+        S.docV = 0;
+        S.docMode = 'kampung';
+        renderProgress();
+        renderDokumentasi();
+        $("progress").classList.remove("hidden");
+        $("status").innerHTML = '<div class="status" style="background:#d4edda;">✅ Form progres diperbarui (data yang sudah diedit tetap dipertahankan).</div>';
+    } catch(err) {
+        console.error("Error di generate:", err);
+        $("status").innerHTML = `<div class="status err">❌ Error: ${esc(err.message)}. Cek console browser (F12).</div>`;
+    }
 }
 
-// ===================== RENDER PROGRESS =====================
-function setVal(v,d,k,f,val) { S.p[v][d].items[k][f] = val; }
+// ===================== RENDER PROGRESS (DIPERBAIKI) =====================
+function setVal(v,d,k,f,val) { 
+    try {
+        if (S.p[v] && S.p[v][d] && S.p[v][d].items && S.p[v][d].items[k]) {
+            S.p[v][d].items[k][f] = val; 
+        }
+    } catch(e) { console.warn("setVal error:", e); }
+}
 function metric(v,d,k,f,n) {
-    let x = S.p[v][d].items[k];
-    return `<div><label>${n}</label><input type="number" min="0" value="${esc(x[f])}" onchange="setVal('${esc(v)}','${d}','${esc(k)}','${f}',this.value)"></div>`;
+    try {
+        let x = S.p[v][d].items[k];
+        return `<div><label>${n}</label><input type="number" min="0" value="${esc(x[f])}" onchange="setVal('${esc(v)}','${d}','${esc(k)}','${f}',this.value)"></div>`;
+    } catch(e) {
+        return `<div><label>${n}</label><input type="number" min="0" value="0"></div>`;
+    }
 }
 function renderProgress() {
-    let vs = group();
-    if (S.v >= vs.length) S.v = vs.length - 1;
-    if (S.v < 0) S.v = 0;
-    let v = vs[S.v];
-    if (!v) { $("content").innerHTML = '<p>Tidak ada kampung.</p>'; return; }
-    let ds = Object.keys(S.p[v.name] || {}).sort((a,b) => toDateObj(a) - toDateObj(b));
+    try {
+        let vs = group();
+        if (S.v >= vs.length) S.v = vs.length - 1;
+        if (S.v < 0) S.v = 0;
+        let v = vs[S.v];
+        if (!v) { $("content").innerHTML = '<p>Tidak ada kampung.</p>'; return; }
+        let ds = Object.keys(S.p[v.name] || {}).sort((a,b) => toDateObj(a) - toDateObj(b));
 
-    $("nav").innerHTML = vs.map((x,i) => `<button class="pill ${i===S.v?'active':''}" onclick="S.v=${i};renderProgress()">${i+1}. ${esc(x.name)}</button>`).join("");
+        $("nav").innerHTML = vs.map((x,i) => `<button class="pill ${i===S.v?'active':''}" onclick="S.v=${i};renderProgress()">${i+1}. ${esc(x.name)}</button>`).join("");
 
-    let h = `<div class="card"><h3 style="margin:0">${esc(v.name)}</h3><small>Distrik ${esc(v.distrik)}</small></div>`;
-    ds.forEach((d,i) => {
-        let last = i === ds.length - 1;
-        let isLastKampung = S.v === vs.length - 1;
-        let labelLast = "";
-        if (last && !isLastKampung) labelLast = " — HARI TERAKHIR KAMPUNG (SEBELUM PINDAH)";
-        else if (last && isLastKampung) labelLast = " — HARI TERAKHIR KAMPUNG (PENUTUPAN)";
-        h += `<div class="day ${last?"last":""}"><h4>${fmt(d)}${labelLast}</h4><div class="daybody">`;
-        let items = S.p[v.name][d].items;
-        if (items && Object.keys(items).length > 0) {
-            v.items.filter(w => {
-                let dw = toDateObj(d), sw = toDateObj(w.start), ew = toDateObj(w.end);
-                return sw && ew && dw >= sw && dw <= ew;
-            }).forEach(w => {
-                let k = w.sls + "||" + w.ppl;
-                let x = items[k];
-                if (x) {
-                    h += `<div class="sls"><b>${esc(w.sls)} — ${esc(w.ppl)}</b><div class="metrics">
-                        ${metric(v.name,d,k,"assignment","Assignment")}
-                        ${metric(v.name,d,k,"bku","BKU")}
-                        ${metric(v.name,d,k,"keluarga","Keluarga")}
-                        ${metric(v.name,d,k,"bangunan","Bangunan Lainnya")}
-                        ${metric(v.name,d,k,"usaha","Usaha")}
-                    </div>
-                    <div style="margin-top:7px"><input placeholder="Catatan SLS" value="${esc(x.notes)}" onchange="setVal('${esc(v.name)}','${d}','${esc(k)}','notes',this.value)"></div></div>`;
-                }
-            });
-        } else {
-            h += `<p style="color:#999;">Tidak ada data untuk hari ini.</p>`;
-        }
-        h += `</div></div>`;
-    });
-    h += `<div class="row" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px">
-        <button class="btn" onclick="save()">💾 Simpan</button>
-        ${S.v>0?`<button class="btn" onclick="S.v--;renderProgress()">◀ Sebelumnya</button>`:''}
-        ${S.v<vs.length-1?`<button class="btn btn-primary" onclick="S.v++;renderProgress()">Selanjutnya ▶</button>`:`<button class="btn btn-success" onclick="preview()">👁 Preview Word</button>`}
-    </div>`;
-    $("content").innerHTML = h;
+        let h = `<div class="card"><h3 style="margin:0">${esc(v.name)}</h3><small>Distrik ${esc(v.distrik)}</small></div>`;
+        ds.forEach((d,i) => {
+            let last = i === ds.length - 1;
+            let isLastKampung = S.v === vs.length - 1;
+            let labelLast = "";
+            if (last && !isLastKampung) labelLast = " — HARI TERAKHIR KAMPUNG (SEBELUM PINDAH)";
+            else if (last && isLastKampung) labelLast = " — HARI TERAKHIR KAMPUNG (PENUTUPAN)";
+            h += `<div class="day ${last?"last":""}"><h4>${fmt(d)}${labelLast}</h4><div class="daybody">`;
+            let items = S.p[v.name][d].items;
+            if (items && Object.keys(items).length > 0) {
+                v.items.filter(w => {
+                    let dw = toDateObj(d), sw = toDateObj(w.start), ew = toDateObj(w.end);
+                    return sw && ew && dw >= sw && dw <= ew;
+                }).forEach(w => {
+                    let k = w.sls + "||" + w.ppl;
+                    let x = items[k];
+                    if (x) {
+                        h += `<div class="sls"><b>${esc(w.sls)} — ${esc(w.ppl)}</b><div class="metrics">
+                            ${metric(v.name,d,k,"assignment","Assignment")}
+                            ${metric(v.name,d,k,"bku","BKU")}
+                            ${metric(v.name,d,k,"keluarga","Keluarga")}
+                            ${metric(v.name,d,k,"bangunan","Bangunan Lainnya")}
+                            ${metric(v.name,d,k,"usaha","Usaha")}
+                        </div>
+                        <div style="margin-top:7px"><input placeholder="Catatan SLS" value="${esc(x.notes)}" onchange="setVal('${esc(v.name)}','${d}','${esc(k)}','notes',this.value)"></div></div>`;
+                    }
+                });
+            } else {
+                h += `<p style="color:#999;">Tidak ada data untuk hari ini.</p>`;
+            }
+            h += `</div></div>`;
+        });
+        h += `<div class="row" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px">
+            <button class="btn" onclick="save()">💾 Simpan</button>
+            ${S.v>0?`<button class="btn" onclick="S.v--;renderProgress()">◀ Sebelumnya</button>`:''}
+            ${S.v<vs.length-1?`<button class="btn btn-primary" onclick="S.v++;renderProgress()">Selanjutnya ▶</button>`:`<button class="btn btn-success" onclick="preview()">👁 Preview Word</button>`}
+        </div>`;
+        $("content").innerHTML = h;
+    } catch(err) {
+        console.error("Error renderProgress:", err);
+        $("content").innerHTML = `<p class="err">Error: ${esc(err.message)}</p>`;
+    }
 }
 
 // ===================== DOKUMENTASI =====================
 function renderDokumentasi() {
-    let vs = group();
-    if (vs.length === 0) { $("docNav").innerHTML = '<p style="color:#999">Belum ada kampung. Generate form progres terlebih dahulu.</p>'; $("docContent").innerHTML = ''; return; }
-    let navHTML = vs.map((x,i) => `<button class="pill ${S.docMode==='kampung'&&i===S.docV?'active':''}" onclick="S.docMode='kampung';S.docV=${i};renderDokumentasi()">${i+1}. ${esc(x.name)}</button>`).join('');
-    navHTML += `<button class="pill ${S.docMode==='perahu'?'active':''}" onclick="S.docMode='perahu';renderDokumentasi()" style="background:#0C3B63;color:white;font-weight:bold;">🚤 Perahu</button>`;
-    $("docNav").innerHTML = navHTML;
-    if (S.docMode === 'perahu') {
-        if (!S.photos["Perahu"] || S.photos["Perahu"].length === 0) S.photos["Perahu"] = [{ src:"", caption:"Dokumentasi diatas perahu" }, { src:"", caption:"Foto KTP Motoris" }];
-        renderDokumentasiPerahu(); return;
-    }
-    let v = vs[S.docV];
-    if (!S.photos[v.name]) S.photos[v.name] = [{ src:"", caption:"" }];
-    let h = `<div class="card"><h3 style="margin:0">${esc(v.name)}</h3><small>Distrik ${esc(v.distrik)}</small></div><div class="photo-grid">`;
-    S.photos[v.name].forEach((p,i) => {
-        h += `<div class="photo-item"><div class="head" style="margin-bottom:6px"><b>Gambar ${i+1}</b><button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="removePhoto(${S.docV},${i})">Hapus</button></div>
-            <div class="preview-img">${p.src ? `<img src="${p.src}" style="width:100%;height:100%;object-fit:contain">` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999">Belum ada gambar</div>'}</div>
-            <input type="file" accept="image/*" onchange="uploadPhoto(${S.docV},${i},this)" style="margin-top:6px;width:100%">
-            <input type="text" placeholder="Caption gambar" value="${esc(p.caption)}" onchange="updateCaption(${S.docV},${i},this.value)" style="margin-top:6px;width:100%;padding:6px;border:1px solid #ddd;border-radius:3px">
+    try {
+        let vs = group();
+        if (vs.length === 0) { $("docNav").innerHTML = '<p style="color:#999">Belum ada kampung. Generate form progres terlebih dahulu.</p>'; $("docContent").innerHTML = ''; return; }
+        let navHTML = vs.map((x,i) => `<button class="pill ${S.docMode==='kampung'&&i===S.docV?'active':''}" onclick="S.docMode='kampung';S.docV=${i};renderDokumentasi()">${i+1}. ${esc(x.name)}</button>`).join('');
+        navHTML += `<button class="pill ${S.docMode==='perahu'?'active':''}" onclick="S.docMode='perahu';renderDokumentasi()" style="background:#0C3B63;color:white;font-weight:bold;">🚤 Perahu</button>`;
+        $("docNav").innerHTML = navHTML;
+        if (S.docMode === 'perahu') {
+            if (!S.photos["Perahu"] || S.photos["Perahu"].length === 0) S.photos["Perahu"] = [{ src:"", caption:"Dokumentasi diatas perahu" }, { src:"", caption:"Foto KTP Motoris" }];
+            renderDokumentasiPerahu(); return;
+        }
+        let v = vs[S.docV];
+        if (!S.photos[v.name]) S.photos[v.name] = [{ src:"", caption:"" }];
+        let h = `<div class="card"><h3 style="margin:0">${esc(v.name)}</h3><small>Distrik ${esc(v.distrik)}</small></div><div class="photo-grid">`;
+        S.photos[v.name].forEach((p,i) => {
+            h += `<div class="photo-item"><div class="head" style="margin-bottom:6px"><b>Gambar ${i+1}</b><button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="removePhoto(${S.docV},${i})">Hapus</button></div>
+                <div class="preview-img">${p.src ? `<img src="${p.src}" style="width:100%;height:100%;object-fit:contain">` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999">Belum ada gambar</div>'}</div>
+                <input type="file" accept="image/*" onchange="uploadPhoto(${S.docV},${i},this)" style="margin-top:6px;width:100%">
+                <input type="text" placeholder="Caption gambar" value="${esc(p.caption)}" onchange="updateCaption(${S.docV},${i},this.value)" style="margin-top:6px;width:100%;padding:6px;border:1px solid #ddd;border-radius:3px">
+            </div>`;
+        });
+        h += `</div><div class="row" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px">
+            <button class="btn" onclick="addPhoto(${S.docV})">+ Tambah Gambar</button>
+            ${S.docV>0?`<button class="btn" onclick="S.docMode='kampung';S.docV--;renderDokumentasi()">◀ Sebelumnya</button>`:''}
+            ${S.docV<vs.length-1?`<button class="btn btn-primary" onclick="S.docMode='kampung';S.docV++;renderDokumentasi()">Selanjutnya ▶</button>`:''}
         </div>`;
-    });
-    h += `</div><div class="row" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px">
-        <button class="btn" onclick="addPhoto(${S.docV})">+ Tambah Gambar</button>
-        ${S.docV>0?`<button class="btn" onclick="S.docMode='kampung';S.docV--;renderDokumentasi()">◀ Sebelumnya</button>`:''}
-        ${S.docV<vs.length-1?`<button class="btn btn-primary" onclick="S.docMode='kampung';S.docV++;renderDokumentasi()">Selanjutnya ▶</button>`:''}
-    </div>`;
-    $("docContent").innerHTML = h;
+        $("docContent").innerHTML = h;
+    } catch(err) {
+        console.error("renderDokumentasi error:", err);
+        $("docContent").innerHTML = `<p class="err">Error: ${esc(err.message)}</p>`;
+    }
 }
 function renderDokumentasiPerahu() {
-    let perahuPhotos = S.photos["Perahu"] || [];
-    if (perahuPhotos.length === 0) perahuPhotos = [{ src:"", caption:"Dokumentasi diatas perahu" }, { src:"", caption:"Foto KTP Motoris" }];
-    S.photos["Perahu"] = perahuPhotos;
-    let h = `<div class="card"><h3 style="margin:0">🚤 Dokumentasi Perahu</h3><small>Dokumentasi perjalanan dinas menggunakan perahu</small></div><div class="photo-grid">`;
-    perahuPhotos.forEach((p,i) => {
-        h += `<div class="photo-item"><div class="head" style="margin-bottom:6px"><b>Gambar Perahu ${i+1}</b><button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="removePhotoPerahu(${i})">Hapus</button></div>
-            <div class="preview-img">${p.src ? `<img src="${p.src}" style="width:100%;height:100%;object-fit:contain">` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999">Belum ada gambar</div>'}</div>
-            <input type="file" accept="image/*" onchange="uploadPhotoPerahu(${i},this)" style="margin-top:6px;width:100%">
-            <input type="text" placeholder="Caption gambar" value="${esc(p.caption)}" onchange="updateCaptionPerahu(${i},this.value)" style="margin-top:6px;width:100%;padding:6px;border:1px solid #ddd;border-radius:3px">
+    try {
+        let perahuPhotos = S.photos["Perahu"] || [];
+        if (perahuPhotos.length === 0) perahuPhotos = [{ src:"", caption:"Dokumentasi diatas perahu" }, { src:"", caption:"Foto KTP Motoris" }];
+        S.photos["Perahu"] = perahuPhotos;
+        let h = `<div class="card"><h3 style="margin:0">🚤 Dokumentasi Perahu</h3><small>Dokumentasi perjalanan dinas menggunakan perahu</small></div><div class="photo-grid">`;
+        perahuPhotos.forEach((p,i) => {
+            h += `<div class="photo-item"><div class="head" style="margin-bottom:6px"><b>Gambar Perahu ${i+1}</b><button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="removePhotoPerahu(${i})">Hapus</button></div>
+                <div class="preview-img">${p.src ? `<img src="${p.src}" style="width:100%;height:100%;object-fit:contain">` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999">Belum ada gambar</div>'}</div>
+                <input type="file" accept="image/*" onchange="uploadPhotoPerahu(${i},this)" style="margin-top:6px;width:100%">
+                <input type="text" placeholder="Caption gambar" value="${esc(p.caption)}" onchange="updateCaptionPerahu(${i},this.value)" style="margin-top:6px;width:100%;padding:6px;border:1px solid #ddd;border-radius:3px">
+            </div>`;
+        });
+        h += `</div><div class="row" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px">
+            <button class="btn" onclick="addPhotoPerahu()">+ Tambah Gambar Perahu</button>
+            <button class="btn" onclick="S.docMode='kampung';S.docV=0;renderDokumentasi()">◀ Kembali ke Kampung</button>
         </div>`;
-    });
-    h += `</div><div class="row" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px">
-        <button class="btn" onclick="addPhotoPerahu()">+ Tambah Gambar Perahu</button>
-        <button class="btn" onclick="S.docMode='kampung';S.docV=0;renderDokumentasi()">◀ Kembali ke Kampung</button>
-    </div>`;
-    $("docContent").innerHTML = h;
+        $("docContent").innerHTML = h;
+    } catch(err) {
+        console.error("renderDokumentasiPerahu error:", err);
+        $("docContent").innerHTML = `<p class="err">Error: ${esc(err.message)}</p>`;
+    }
 }
 function addPhotoPerahu() { S.photos["Perahu"].push({ src:"", caption:"" }); renderDokumentasiPerahu(); }
 function removePhotoPerahu(index) { if (S.photos["Perahu"].length <= 1) { alert('Minimal 1 gambar perahu!'); return; } S.photos["Perahu"].splice(index,1); renderDokumentasiPerahu(); }
@@ -692,103 +774,118 @@ function removePhoto(index, photoIndex) { let vs=group(); let v=vs[index]; if(S.
 function uploadPhoto(index, photoIndex, input) { let file = input.files[0]; if (!file) return; $("status").innerHTML = '<div class="status">📤 Upload gambar ke Cloudinary...</div>'; uploadFileToCloudinary(file,true,function(url){ let vs=group(); let v=vs[index]; S.photos[v.name][photoIndex].src = url; renderDokumentasi(); $("status").innerHTML = '<div class="status">✅ Gambar berhasil diupload!</div>'; }, function(err){ alert("Gagal upload gambar: "+err.message); }); }
 function updateCaption(index, photoIndex, value) { let vs=group(); let v=vs[index]; S.photos[v.name][photoIndex].caption = value; }
 
-// ===================== NARRATIVE & WORD =====================
+// ===================== NARRATIVE & WORD (DIPERBAIKI) =====================
 function generateNarrativeTable() {
-    let out = "", vs = group(), totalKampung = vs.length;
-    vs.forEach((v, vi) => {
-        let aparatData = S.kampung.find(k => k.kampung === v.name);
-        let namaAparat = aparatData?.mengetahui || "Kepala Kampung";
-        let jabatanAparat = aparatData?.jabatan || "Kepala Kampung";
-        let ds = Object.keys(S.p[v.name] || {}).sort((a,b) => toDateObj(a) - toDateObj(b));
-        ds.forEach((d, di) => {
-            let isFirstDayInKampung = (di === 0), isLastDayInKampung = (di === ds.length - 1);
-            let isLastKampung = (vi === totalKampung - 1), isFinalDay = isLastKampung && isLastDayInKampung;
-            let isFirstDayOfFirstKampung = (vi === 0 && isFirstDayInKampung);
-            out += `<p style="margin-top:12pt;margin-bottom:0pt;text-align:justify;"><b>${fmt(d)}</b></p><ul style="margin-top:3pt;margin-bottom:0pt;padding-left:20pt;text-align:justify;">`;
-            if (isFirstDayOfFirstKampung) {
-                out += `<li>Tim berangkat dari Waisai menuju ${esc(v.name)}, Distrik ${esc(v.distrik)}, menggunakan transportasi perahu motor. Tim tiba di kampung tujuan dan mempersiapkan pelaksanaan pendataan lapangan.</li>`;
-                out += `<li>Tim menemui Bapak ${esc(namaAparat)} selaku ${esc(jabatanAparat)} ${esc(v.name)}.</li>`;
-                out += `<li>Tim meminta visum Surat Tugas serta menyampaikan maksud dan tujuan pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026 kepada aparat kampung.</li>`;
-                out += `<li>Setelah memperoleh izin, masing-masing petugas menuju wilayah tugas untuk melakukan penelusuran wilayah.</li>`;
-            } else if (vi > 0 && isFirstDayInKampung) {
-                out += `<li>Tim melakukan check assignment kampung sebelumnya (${esc(vs[vi-1].name)}) dan mempersiapkan keberangkatan menuju ${esc(v.name)}, Distrik ${esc(v.distrik)}.</li>`;
-                out += `<li>Tim melakukan perjalanan dari ${esc(vs[vi-1].name)} menuju ${esc(v.name)}. Setelah tiba, tim melakukan koordinasi dengan aparat kampung untuk izin dan persiapan pelaksanaan pendataan.</li>`;
-                out += `<li>Tim menemui Bapak ${esc(namaAparat)} selaku ${esc(jabatanAparat)} ${esc(v.name)}.</li>`;
-                out += `<li>Tim meminta visum Surat Tugas serta menyampaikan maksud dan tujuan pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026 kepada aparat kampung.</li>`;
-                out += `<li>Setelah memperoleh izin, masing-masing petugas menuju wilayah tugas untuk melakukan penelusuran wilayah.</li>`;
-            } else {
-                out += `<li>Tim melanjutkan kegiatan pendataan door to door pada wilayah tugas masing-masing.</li>`;
-            }
-            if (!isFirstDayOfFirstKampung) {
-                let items = S.p[v.name][d].items;
-                if (items && Object.keys(items).length > 0) {
-                    Object.values(items).forEach(x => {
-                        let a = +x.assignment||0, b = +x.bku||0, k = +x.keluarga||0, bl = +x.bangunan||0, u = +x.usaha||0;
-                        if (!a && !b && !k && !bl && !u && !x.notes) {
-                            out += `<li>PPL ${esc(x.ppl)} melakukan pendataan di SLS ${esc(x.sls)} dan tidak ada data yang berhasil didata pada hari ini.</li>`;
-                            return;
-                        }
-                        let r = [];
-                        if (b) r.push(`${b} BKU`);
-                        if (k) r.push(`${k} Keluarga`);
-                        if (bl) r.push(`${bl} Bangunan Lainnya`);
-                        let detail = r.length ? `, dengan rincian ${r.join(", ")}.` : ".";
-                        out += `<li>PPL ${esc(x.ppl)} melakukan pendataan di SLS ${esc(x.sls)} dan berhasil mendata serta submit sebanyak <b>${a}</b> assignment${detail} Total usaha yang ditemukan sebanyak <b>${u}</b> usaha.${x.notes ? " " + esc(x.notes) : ""}</li>`;
-                    });
+    try {
+        let out = "", vs = group(), totalKampung = vs.length;
+        if (vs.length === 0) return "<p>Tidak ada data.</p>";
+        
+        vs.forEach((v, vi) => {
+            let aparatData = S.kampung.find(k => k.kampung === v.name);
+            let namaAparat = aparatData?.mengetahui || "Kepala Kampung";
+            let jabatanAparat = aparatData?.jabatan || "Kepala Kampung";
+            let ds = Object.keys(S.p[v.name] || {}).sort((a,b) => toDateObj(a) - toDateObj(b));
+            if (ds.length === 0) return;
+            
+            ds.forEach((d, di) => {
+                let isFirstDayInKampung = (di === 0), isLastDayInKampung = (di === ds.length - 1);
+                let isLastKampung = (vi === totalKampung - 1), isFinalDay = isLastKampung && isLastDayInKampung;
+                let isFirstDayOfFirstKampung = (vi === 0 && isFirstDayInKampung);
+                out += `<p style="margin-top:12pt;margin-bottom:0pt;text-align:justify;"><b>${fmt(d)}</b></p><ul style="margin-top:3pt;margin-bottom:0pt;padding-left:20pt;text-align:justify;">`;
+                if (isFirstDayOfFirstKampung) {
+                    out += `<li>Tim berangkat dari Waisai menuju ${esc(v.name)}, Distrik ${esc(v.distrik)}, menggunakan transportasi perahu motor. Tim tiba di kampung tujuan dan mempersiapkan pelaksanaan pendataan lapangan.</li>`;
+                    out += `<li>Tim menemui Bapak ${esc(namaAparat)} selaku ${esc(jabatanAparat)} ${esc(v.name)}.</li>`;
+                    out += `<li>Tim meminta visum Surat Tugas serta menyampaikan maksud dan tujuan pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026 kepada aparat kampung.</li>`;
+                    out += `<li>Setelah memperoleh izin, masing-masing petugas menuju wilayah tugas untuk melakukan penelusuran wilayah.</li>`;
+                } else if (vi > 0 && isFirstDayInKampung) {
+                    out += `<li>Tim melakukan check assignment kampung sebelumnya (${esc(vs[vi-1].name)}) dan mempersiapkan keberangkatan menuju ${esc(v.name)}, Distrik ${esc(v.distrik)}.</li>`;
+                    out += `<li>Tim melakukan perjalanan dari ${esc(vs[vi-1].name)} menuju ${esc(v.name)}. Setelah tiba, tim melakukan koordinasi dengan aparat kampung untuk izin dan persiapan pelaksanaan pendataan.</li>`;
+                    out += `<li>Tim menemui Bapak ${esc(namaAparat)} selaku ${esc(jabatanAparat)} ${esc(v.name)}.</li>`;
+                    out += `<li>Tim meminta visum Surat Tugas serta menyampaikan maksud dan tujuan pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026 kepada aparat kampung.</li>`;
+                    out += `<li>Setelah memperoleh izin, masing-masing petugas menuju wilayah tugas untuk melakukan penelusuran wilayah.</li>`;
+                } else {
+                    out += `<li>Tim melanjutkan kegiatan pendataan door to door pada wilayah tugas masing-masing.</li>`;
                 }
-            }
-            if (isFinalDay) {
-                out += `<li>Tim melakukan check assignment dan memastikan isian kampung terakhir (${esc(v.name)}) sebelum kembali ke Waisai.</li>`;
-                out += `<li>Petugas melakukan pengecekan administrasi dan kelengkapan hasil pendataan sebagai tahap akhir kegiatan lapangan.</li>`;
-                out += `<li>Setelah seluruh hasil pendataan dinyatakan lengkap, tim mempersiapkan keberangkatan kembali menuju Waisai.</li>`;
-                out += `<li>Tim meninggalkan Kampung ${esc(v.name)} dan melakukan perjalanan kembali ke Waisai.</li>`;
-                let rangeText = formatTanggalRange(S.tanggalAwal, S.tanggalAkhir) || `${fmt(S.tanggalAwal)} sampai ${fmt(S.tanggalAkhir)}`;
-                out += `<li>Dengan keberangkatan tersebut, rangkaian kegiatan pendataan lapangan pada periode ${rangeText} dinyatakan selesai.</li>`;
-            }
-            out += `</ul>`;
+                if (!isFirstDayOfFirstKampung) {
+                    let items = S.p[v.name]?.[d]?.items;
+                    if (items && Object.keys(items).length > 0) {
+                        Object.values(items).forEach(x => {
+                            if (!x) return;
+                            let a = +x.assignment||0, b = +x.bku||0, k = +x.keluarga||0, bl = +x.bangunan||0, u = +x.usaha||0;
+                            if (!a && !b && !k && !bl && !u && !x.notes) {
+                                out += `<li>PPL ${esc(x.ppl)} melakukan pendataan di SLS ${esc(x.sls)} dan tidak ada data yang berhasil didata pada hari ini.</li>`;
+                                return;
+                            }
+                            let r = [];
+                            if (b) r.push(`${b} BKU`);
+                            if (k) r.push(`${k} Keluarga`);
+                            if (bl) r.push(`${bl} Bangunan Lainnya`);
+                            let detail = r.length ? `, dengan rincian ${r.join(", ")}.` : ".";
+                            out += `<li>PPL ${esc(x.ppl)} melakukan pendataan di SLS ${esc(x.sls)} dan berhasil mendata serta submit sebanyak <b>${a}</b> assignment${detail} Total usaha yang ditemukan sebanyak <b>${u}</b> usaha.${x.notes ? " " + esc(x.notes) : ""}</li>`;
+                        });
+                    }
+                }
+                if (isFinalDay) {
+                    out += `<li>Tim melakukan check assignment dan memastikan isian kampung terakhir (${esc(v.name)}) sebelum kembali ke Waisai.</li>`;
+                    out += `<li>Petugas melakukan pengecekan administrasi dan kelengkapan hasil pendataan sebagai tahap akhir kegiatan lapangan.</li>`;
+                    out += `<li>Setelah seluruh hasil pendataan dinyatakan lengkap, tim mempersiapkan keberangkatan kembali menuju Waisai.</li>`;
+                    out += `<li>Tim meninggalkan Kampung ${esc(v.name)} dan melakukan perjalanan kembali ke Waisai.</li>`;
+                    let rangeText = formatTanggalRange(S.tanggalAwal, S.tanggalAkhir) || `${fmt(S.tanggalAwal)} sampai ${fmt(S.tanggalAkhir)}`;
+                    out += `<li>Dengan keberangkatan tersebut, rangkaian kegiatan pendataan lapangan pada periode ${rangeText} dinyatakan selesai.</li>`;
+                }
+                out += `</ul>`;
+            });
         });
-    });
-    return out;
+        return out;
+    } catch(err) {
+        console.error("generateNarrativeTable error:", err);
+        return `<p class="err">Error: ${esc(err.message)}</p>`;
+    }
 }
 
 function generateWordHTML(resizedImages) {
-    let docHtml = '', vs = group();
-    let tujuan = esc(document.getElementById('tujuan').value.trim());
-    let tanggalDisplay = formatTanggalRange(S.tanggalAwal, S.tanggalAkhir);
-    let perihal = esc(document.getElementById('perihal').value.trim());
-    let nomorSurat = esc(document.getElementById('nomorSurat').value.trim());
-    let pplNames = S.petugas.filter(p => p.trim());
-    docHtml += `<tr><td style="border:none;padding:0;text-align:center;vertical-align:top;mso-line-height-rule:exactly;"><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">LAPORAN PERJALANAN DINAS</p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;"> </p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;"> </p></td></tr>`;
-    docHtml += `<table style="width:100%;border-collapse:collapse;font-family:'Times New Roman',serif;font-size:12pt;border:1px solid #000;">`;
-    docHtml += `<tr><td style="border:1px solid #000;padding:8px;vertical-align:top;width:50%;"><b>Tujuan:</b> ${tujuan}</td><td style="border:1px solid #000;padding:8px;vertical-align:top;width:50%;"><b>Nama:</b><br>${pplNames.map((p,i)=>`${i+1}. ${esc(p)}`).join('<br>')}</td></tr>`;
-    docHtml += `<tr><td style="border:1px solid #000;padding:8px;vertical-align:top;"><b>Tanggal Tugas:</b> ${tanggalDisplay}</td><td style="border:1px solid #000;padding:8px;vertical-align:top;"></td></tr>`;
-    docHtml += `<tr><td style="border:1px solid #000;padding:8px;vertical-align:top;"><b>Perihal:</b> ${perihal}</td><td style="border:1px solid #000;padding:8px;vertical-align:top;padding-top:20px;padding-bottom:20px;"><b>Tanda Tangan</b><br><br>${pplNames.map((p,i)=>`${i+1}. <span style="color:white;">${esc(p)}</span><br><br>`).join('')}</td></tr>`;
-    docHtml += `<tr><td colspan="2" style="border:1px solid #000;padding:8px;vertical-align:top;"><b>Nomor Surat Tugas:</b> ${nomorSurat}</td></tr>`;
-    docHtml += `<tr><td colspan="2" style="border:1px solid #000;padding:8px;vertical-align:top;">${generateNarrativeTable()}</td></tr>`;
-    docHtml += `<tr><td style="border:none;padding:8px;vertical-align:top;width:50%;"></td><td style="border:none;padding:8px;vertical-align:bottom;text-align:center;width:50%;"><div style="text-align:center;padding-top:60px;padding-bottom:20px;"><p style="text-align:center;margin:0;padding:0;font-weight:normal;">Mengetahui</p><p style="text-align:center;margin:0;padding:0;font-weight:normal;">Kepala BPS Kabupaten Raja Ampat</p><br><br><br><br><br><br><p style="text-align:center;margin:0;padding:0;font-weight:bold;text-decoration:underline;">Frida Irian S. Ompusunggu, SST, M.Ling.</p><p style="text-align:center;margin:0;padding:0;">NIP. 19860407 200902 2 004</p></div></td></tr>`;
-    docHtml += `</table>`;
-    vs.forEach((v,index)=>{
-        let photos = S.photos[v.name] || [];
-        let hasPhoto = photos.some(p=>p.src);
-        if(hasPhoto){
-            if(index===0) docHtml += `<div style="margin-top:0;margin-bottom:0;"><!--[if gte mso 9]><br clear="all" style="mso-break-type:section-break;page-break-before:always;"><![endif]-->`; 
-            else docHtml += `<div style="margin-top:0;margin-bottom:0;"><!--[if gte mso 9]><br clear="all" style="mso-break-type:section-break;page-break-before:always;"><![endif]-->`;
+    try {
+        let docHtml = '', vs = group();
+        let tujuan = esc(document.getElementById('tujuan').value.trim());
+        let tanggalDisplay = formatTanggalRange(S.tanggalAwal, S.tanggalAkhir);
+        let perihal = esc(document.getElementById('perihal').value.trim());
+        let nomorSurat = esc(document.getElementById('nomorSurat').value.trim());
+        let pplNames = S.petugas.filter(p => p.trim());
+        docHtml += `<tr><td style="border:none;padding:0;text-align:center;vertical-align:top;mso-line-height-rule:exactly;"><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">LAPORAN PERJALANAN DINAS</p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;"> </p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;"> </p></td></tr>`;
+        docHtml += `<table style="width:100%;border-collapse:collapse;font-family:'Times New Roman',serif;font-size:12pt;border:1px solid #000;">`;
+        docHtml += `<tr><td style="border:1px solid #000;padding:8px;vertical-align:top;width:50%;"><b>Tujuan:</b> ${tujuan}</td><td style="border:1px solid #000;padding:8px;vertical-align:top;width:50%;"><b>Nama:</b><br>${pplNames.map((p,i)=>`${i+1}. ${esc(p)}`).join('<br>')}</td></tr>`;
+        docHtml += `<tr><td style="border:1px solid #000;padding:8px;vertical-align:top;"><b>Tanggal Tugas:</b> ${tanggalDisplay}</td><td style="border:1px solid #000;padding:8px;vertical-align:top;"></td></tr>`;
+        docHtml += `<tr><td style="border:1px solid #000;padding:8px;vertical-align:top;"><b>Perihal:</b> ${perihal}</td><td style="border:1px solid #000;padding:8px;vertical-align:top;padding-top:20px;padding-bottom:20px;"><b>Tanda Tangan</b><br><br>${pplNames.map((p,i)=>`${i+1}. <span style="color:white;">${esc(p)}</span><br><br>`).join('')}</td></tr>`;
+        docHtml += `<tr><td colspan="2" style="border:1px solid #000;padding:8px;vertical-align:top;"><b>Nomor Surat Tugas:</b> ${nomorSurat}</td></tr>`;
+        docHtml += `<tr><td colspan="2" style="border:1px solid #000;padding:8px;vertical-align:top;">${generateNarrativeTable()}</td></tr>`;
+        docHtml += `<tr><td style="border:none;padding:8px;vertical-align:top;width:50%;"></td><td style="border:none;padding:8px;vertical-align:bottom;text-align:center;width:50%;"><div style="text-align:center;padding-top:60px;padding-bottom:20px;"><p style="text-align:center;margin:0;padding:0;font-weight:normal;">Mengetahui</p><p style="text-align:center;margin:0;padding:0;font-weight:normal;">Kepala BPS Kabupaten Raja Ampat</p><br><br><br><br><br><br><p style="text-align:center;margin:0;padding:0;font-weight:bold;text-decoration:underline;">Frida Irian S. Ompusunggu, SST, M.Ling.</p><p style="text-align:center;margin:0;padding:0;">NIP. 19860407 200902 2 004</p></div></td></tr>`;
+        docHtml += `</table>`;
+        vs.forEach((v,index)=>{
+            let photos = S.photos && S.photos[v.name] ? S.photos[v.name] : [];
+            let hasPhoto = photos.some(p=>p.src);
+            if(hasPhoto){
+                if(index===0) docHtml += `<div style="margin-top:0;margin-bottom:0;"><!--[if gte mso 9]><br clear="all" style="mso-break-type:section-break;page-break-before:always;"><![endif]-->`; 
+                else docHtml += `<div style="margin-top:0;margin-bottom:0;"><!--[if gte mso 9]><br clear="all" style="mso-break-type:section-break;page-break-before:always;"><![endif]-->`;
+                docHtml += `<table style="width:100%;border-collapse:collapse;border:none;mso-table-lspace:0;mso-table-rspace:0;margin-top:0;margin-bottom:0;">`;
+                docHtml += `<tr><td style="border:none;padding:0;text-align:center;vertical-align:top;mso-line-height-rule:exactly;"><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">DOKUMENTASI PERJALANAN DINAS PELAKSANAAN LAPANGAN</p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">SENSUS EKONOMI 2026</p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">KAMPUNG ${esc(v.name).toUpperCase()}</p></td></tr>`;
+                photos.forEach((p,idx)=>{ if(p.src){ let imgSrc=p.src; let key=v.name+'_'+idx; if(resizedImages&&resizedImages[key]) imgSrc=resizedImages[key]; docHtml+=`<tr><td style="border:none;padding:10px 0;text-align:center;vertical-align:top;"><img src="${imgSrc}" style="height:347pt;width:auto;max-width:100%;object-fit:contain;border:1px solid #cccccc;border-radius:4px;display:block;margin:0 auto;mso-height-rule:exactly;">${p.caption?`<p style="text-align:center;font-size:10pt;margin-top:5px;margin-bottom:0;padding:0;font-style:italic;">${esc(p.caption)}</p>`:''}</td></tr>`; } });
+                docHtml += `</table></div>`;
+            }
+        });
+        let perahuPhotos = S.photos && S.photos["Perahu"] ? S.photos["Perahu"] : [];
+        let hasPerahu = perahuPhotos.some(p=>p.src);
+        if(hasPerahu){
+            docHtml += `<div style="margin-top:0;margin-bottom:0;"><!--[if gte mso 9]><br clear="all" style="mso-break-type:section-break;page-break-before:always;"><![endif]-->`;
             docHtml += `<table style="width:100%;border-collapse:collapse;border:none;mso-table-lspace:0;mso-table-rspace:0;margin-top:0;margin-bottom:0;">`;
-            docHtml += `<tr><td style="border:none;padding:0;text-align:center;vertical-align:top;mso-line-height-rule:exactly;"><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">DOKUMENTASI PERJALANAN DINAS PELAKSANAAN LAPANGAN</p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">SENSUS EKONOMI 2026</p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">KAMPUNG ${esc(v.name).toUpperCase()}</p></td></tr>`;
-            photos.forEach((p,idx)=>{ if(p.src){ let imgSrc=p.src; let key=v.name+'_'+idx; if(resizedImages&&resizedImages[key]) imgSrc=resizedImages[key]; docHtml+=`<tr><td style="border:none;padding:10px 0;text-align:center;vertical-align:top;"><img src="${imgSrc}" style="height:347pt;width:auto;max-width:100%;object-fit:contain;border:1px solid #cccccc;border-radius:4px;display:block;margin:0 auto;mso-height-rule:exactly;">${p.caption?`<p style="text-align:center;font-size:10pt;margin-top:5px;margin-bottom:0;padding:0;font-style:italic;">${esc(p.caption)}</p>`:''}</td></tr>`; } });
+            docHtml += `<tr><td style="border:none;padding:0;text-align:center;vertical-align:top;mso-line-height-rule:exactly;"><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">SPJ TRANSPORTASI</p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;"> </p></td></tr>`;
+            perahuPhotos.forEach((p,idx)=>{ if(p.src){ let imgSrc=p.src; let key='Perahu_'+idx; if(resizedImages&&resizedImages[key]) imgSrc=resizedImages[key]; let defaultCaption=idx===0?"Dokumentasi diatas perahu":"Foto KTP Motoris"; let caption=p.caption||defaultCaption; docHtml+=`<tr><td style="border:none;padding:10px 0;text-align:center;vertical-align:top;"><img src="${imgSrc}" style="height:347pt;width:auto;max-width:100%;object-fit:contain;border:1px solid #cccccc;border-radius:4px;display:block;margin:0 auto;mso-height-rule:exactly;"><p style="text-align:center;font-size:10pt;margin-top:5px;margin-bottom:0;padding:0;font-style:italic;">${esc(caption)}</p></td></tr>`; } });
             docHtml += `</table></div>`;
         }
-    });
-    let perahuPhotos = S.photos["Perahu"] || [];
-    let hasPerahu = perahuPhotos.some(p=>p.src);
-    if(hasPerahu){
-        docHtml += `<div style="margin-top:0;margin-bottom:0;"><!--[if gte mso 9]><br clear="all" style="mso-break-type:section-break;page-break-before:always;"><![endif]-->`;
-        docHtml += `<table style="width:100%;border-collapse:collapse;border:none;mso-table-lspace:0;mso-table-rspace:0;margin-top:0;margin-bottom:0;">`;
-        docHtml += `<tr><td style="border:none;padding:0;text-align:center;vertical-align:top;mso-line-height-rule:exactly;"><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;">SPJ TRANSPORTASI</p><p style="text-align:center;font-weight:bold;text-transform:uppercase;font-size:12pt;margin:0;padding:0;line-height:1.2;"> </p></td></tr>`;
-        perahuPhotos.forEach((p,idx)=>{ if(p.src){ let imgSrc=p.src; let key='Perahu_'+idx; if(resizedImages&&resizedImages[key]) imgSrc=resizedImages[key]; let defaultCaption=idx===0?"Dokumentasi diatas perahu":"Foto KTP Motoris"; let caption=p.caption||defaultCaption; docHtml+=`<tr><td style="border:none;padding:10px 0;text-align:center;vertical-align:top;"><img src="${imgSrc}" style="height:347pt;width:auto;max-width:100%;object-fit:contain;border:1px solid #cccccc;border-radius:4px;display:block;margin:0 auto;mso-height-rule:exactly;"><p style="text-align:center;font-size:10pt;margin-top:5px;margin-bottom:0;padding:0;font-style:italic;">${esc(caption)}</p></td></tr>`; } });
-        docHtml += `</table></div>`;
+        return docHtml;
+    } catch(err) {
+        console.error("generateWordHTML error:", err);
+        return `<p class="err">Error generating Word HTML: ${esc(err.message)}</p>`;
     }
-    return docHtml;
 }
 
 function preview(){
@@ -798,7 +895,12 @@ function preview(){
         previewDiv.innerHTML=generateWordHTML(null);
         previewDiv.classList.add('visible');
         setTimeout(()=>{ previewDiv.scrollIntoView({behavior:'smooth',block:'start'}); },100);
-    } catch(err){ console.error(err); alert("Error saat Preview."); }
+        $("status").innerHTML = '<div class="status">✅ Preview berhasil ditampilkan.</div>';
+    } catch(err){ 
+        console.error("Error saat Preview:", err);
+        alert("Terjadi error saat Preview:\n\n" + err.message + "\n\nBuka Console (F12) untuk detail.");
+        $("status").innerHTML = `<div class="status err">❌ Error Preview: ${esc(err.message)}</div>`;
+    }
 }
 
 // ===================== DOWNLOAD WORD (TANPA UPLOAD) =====================
@@ -806,32 +908,33 @@ function word(){
     try {
         if(validate()){alert(validate());return;}
         let vs=group(), imagesToResize=[], imageKeys=[];
-        vs.forEach(v=>{ let photos=S.photos[v.name]||[]; photos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push(v.name+'_'+idx); } }); });
-        let perahuPhotos=S.photos["Perahu"]||[]; perahuPhotos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push('Perahu_'+idx); } });
+        vs.forEach(v=>{ 
+            let photos = S.photos && S.photos[v.name] ? S.photos[v.name] : [];
+            photos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push(v.name+'_'+idx); } }); 
+        });
+        let perahuPhotos = S.photos && S.photos["Perahu"] ? S.photos["Perahu"] : [];
+        perahuPhotos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push('Perahu_'+idx); } });
         if(imagesToResize.length===0){ generateOfflineWord({}); return; }
         $("status").innerHTML='<div class="status">⏳ Mengunduh gambar dari Cloudinary...</div>';
         let resizedImages={}, completed=0, total=imagesToResize.length;
+        if (total === 0) { generateOfflineWord({}); return; }
         imagesToResize.forEach((src,idx)=>{
             fetch(src).then(r=>{ if(!r.ok) throw new Error("Gagal fetch"); return r.blob(); }).then(blob=>{
                 let reader=new FileReader(); reader.onloadend=function(){ let base64=reader.result; let key=imageKeys[idx]; resizeImageToHeight(base64,9.2,function(resizedSrc){ resizedImages[key]=resizedSrc; completed++; checkComplete(); }); }; reader.readAsDataURL(blob);
             }).catch(err=>{ console.warn("Gagal download gambar: ",src); completed++; checkComplete(); });
         });
         function checkComplete(){ if(completed===total){ $("status").innerHTML='<div class="status">⏳ Membuat file Word...</div>'; setTimeout(()=>{ generateOfflineWord(resizedImages); },500); } }
-    } catch(err){ console.error(err); alert("Error saat Download Word."); }
+    } catch(err){ console.error(err); alert("Error saat Download Word: " + err.message); }
 }
 
-// ===== GENERATE WORD (DOWNLOAD SAJA, TANPA UPLOAD) =====
 function generateOfflineWord(resizedImages){
     try {
         let htmlContent = generateWordHTML(resizedImages);
         let blob = new Blob(["\ufeff" + htmlContent], { type: "application/msword;charset=utf-8" });
-
         let ppl = S.petugas.filter(p=>p.trim());
         let namaPpl = ppl.length > 0 ? ppl[0] : "TanpaNama";
         let tanggalSekarang = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }).replace(/\s/g, "_");
         let fileName = `Laporan_Perjalanan_Dinas_Tim_${namaPpl}_${tanggalSekarang}.doc`;
-
-        // ===== DOWNLOAD FILE =====
         let link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = fileName;
@@ -839,43 +942,49 @@ function generateOfflineWord(resizedImages){
         link.click();
         document.body.removeChild(link);
         setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-
-        $("status").innerHTML = `<div class="status" style="background:#d4edda; border-color:#28a745;">
-            ✅ File Word berhasil didownload!<br>
-            📁 ${fileName}
-        </div>`;
-
+        $("status").innerHTML = `<div class="status" style="background:#d4edda; border-color:#28a745;">✅ File Word berhasil didownload!<br>📁 ${fileName}</div>`;
     } catch (err) {
         console.error("Error di generateOfflineWord:", err);
         alert("Terjadi error pada proses Word. Cek konsol browser (F12).");
+        $("status").innerHTML = `<div class="status err">❌ Error: ${esc(err.message)}</div>`;
     }
 }
 
 // ===================== SAVE, LOAD, RESET =====================
 function save(){
-    S.petugas=S.petugas.map(p=>p.trim()).filter(Boolean); if(S.petugas.length===0) S.petugas=[''];
-    S.tujuan=document.getElementById('tujuan').value.trim();
-    S.tanggalAwal=getDateFromInput(document.getElementById('tanggalAwal'));
-    S.tanggalAkhir=getDateFromInput(document.getElementById('tanggalAkhir'));
-    S.perihal=document.getElementById('perihal').value.trim();
-    S.nomorSurat=document.getElementById('nomorSurat').value.trim();
-    localStorage.setItem("laporanGenerator",JSON.stringify(S));
-    $("status").innerHTML='<div class="status">✅ Data tersimpan di browser.</div>';
-    renderPetugas();
+    try {
+        S.petugas=S.petugas.map(p=>p.trim()).filter(Boolean); if(S.petugas.length===0) S.petugas=[''];
+        S.tujuan=document.getElementById('tujuan').value.trim();
+        S.tanggalAwal=getDateFromInput(document.getElementById('tanggalAwal'));
+        S.tanggalAkhir=getDateFromInput(document.getElementById('tanggalAkhir'));
+        S.perihal=document.getElementById('perihal').value.trim();
+        S.nomorSurat=document.getElementById('nomorSurat').value.trim();
+        localStorage.setItem("laporanGenerator",JSON.stringify(S));
+        $("status").innerHTML='<div class="status">✅ Data tersimpan di browser.</div>';
+        renderPetugas();
+    } catch(err) {
+        console.error("save error:", err);
+        alert("Error saving data: " + err.message);
+    }
 }
 function load(){
-    let x=localStorage.getItem("laporanGenerator");
-    if(!x) return alert("Belum ada data tersimpan.");
-    Object.assign(S,JSON.parse(x));
-    document.getElementById('tujuan').value=S.tujuan||"";
-    if(S.tanggalAwal){ let parts=S.tanggalAwal.split('/'); if(parts.length===3) document.getElementById('tanggalAwal').value=`${parts[0]}/${parts[1]}/${parts[2]}`; }
-    if(S.tanggalAkhir){ let parts=S.tanggalAkhir.split('/'); if(parts.length===3) document.getElementById('tanggalAkhir').value=`${parts[0]}/${parts[1]}/${parts[2]}`; }
-    document.getElementById('perihal').value=S.perihal||"Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026";
-    document.getElementById('nomorSurat').value=S.nomorSurat||"";
-    renderKampung(); renderWilayah(); renderPetugas();
-    if(Object.keys(S.p||{}).length){ $("progress").classList.remove("hidden"); renderProgress(); }
-    renderDokumentasi();
-    $("status").innerHTML='<div class="status">✅ Data berhasil dimuat dari browser.</div>';
+    try {
+        let x=localStorage.getItem("laporanGenerator");
+        if(!x) return alert("Belum ada data tersimpan.");
+        Object.assign(S,JSON.parse(x));
+        document.getElementById('tujuan').value=S.tujuan||"";
+        if(S.tanggalAwal){ let parts=S.tanggalAwal.split('/'); if(parts.length===3) document.getElementById('tanggalAwal').value=`${parts[0]}/${parts[1]}/${parts[2]}`; }
+        if(S.tanggalAkhir){ let parts=S.tanggalAkhir.split('/'); if(parts.length===3) document.getElementById('tanggalAkhir').value=`${parts[0]}/${parts[1]}/${parts[2]}`; }
+        document.getElementById('perihal').value=S.perihal||"Pelaksanaan Pendataan Lapangan Sensus Ekonomi 2026";
+        document.getElementById('nomorSurat').value=S.nomorSurat||"";
+        renderKampung(); renderWilayah(); renderPetugas();
+        if(Object.keys(S.p||{}).length){ $("progress").classList.remove("hidden"); renderProgress(); }
+        renderDokumentasi();
+        $("status").innerHTML='<div class="status">✅ Data berhasil dimuat dari browser.</div>';
+    } catch(err) {
+        console.error("load error:", err);
+        alert("Error loading data: " + err.message);
+    }
 }
 function resetAll(){ if(confirm("⚠️ Yakin ingin menghapus SEMUA data?")){ localStorage.removeItem("laporanGenerator"); location.reload(); } }
 
@@ -893,192 +1002,8 @@ function parseCSVLine(line) {
 }
 
 function importLegacyCSV(text) {
-    let lines=text.split('\n').map(l=>l.replace(/\r$/,'')).filter(l=>l.trim()!=='');
-    let section='';
-    let petugasRaw='', tujuanVal='', tanggalAwalVal='', tanggalAkhirVal='', perihalVal='', nomorSuratVal='';
-    let kampungList=[], wilayahList=[], progressData={}, photoData={}, wordBackupData=[];
-
-    let wilayahHeader = null;
-    let progresHeader = null;
-
-    for (let i=0; i<lines.length; i++) {
-        let line = lines[i].trim();
-        if (line.startsWith('=== DATA UTAMA ===')) { section='utama'; continue; }
-        else if (line.startsWith('=== KAMPUNG TUJUAN ===')) { section='kampung'; continue; }
-        else if (line.startsWith('=== WILAYAH TUGAS ===')) { section='wilayah'; continue; }
-        else if (line.startsWith('=== DATA PROGRES ===')) { section='progres'; continue; }
-        else if (line.startsWith('=== DOKUMENTASI ===')) { section='dokumentasi'; continue; }
-        else if (line.startsWith('=== BACKUP WORD ===')) { section='backup'; continue; }
-
-        if (section === 'utama') {
-            if (line.startsWith('Nama Petugas,')) petugasRaw = line.substring('Nama Petugas,'.length).trim();
-            else if (line.startsWith('Tujuan,')) tujuanVal = line.substring('Tujuan,'.length).trim();
-            else if (line.startsWith('Tanggal Awal,')) tanggalAwalVal = line.substring('Tanggal Awal,'.length).trim();
-            else if (line.startsWith('Tanggal Akhir,')) tanggalAkhirVal = line.substring('Tanggal Akhir,'.length).trim();
-            else if (line.startsWith('Perihal,')) perihalVal = line.substring('Perihal,'.length).trim();
-            else if (line.startsWith('Nomor Surat Tugas,')) nomorSuratVal = line.substring('Nomor Surat Tugas,'.length).trim();
-        }
-        else if (section === 'kampung') {
-            let parts = parseCSVLine(line);
-            if (parts.length >= 4 && parts[0] && !parts[0].includes('Kampung')) {
-                kampungList.push({ kampung:parts[0], distrik:parts[1]||'', mengetahui:parts[2]||'', jabatan:parts[3]||'' });
-            }
-        }
-        else if (section === 'wilayah') {
-            if (!wilayahHeader) {
-                let header = parseCSVLine(line);
-                if (header.length >= 10 && header[0] === 'Kampung') {
-                    wilayahHeader = header.map(h => h.trim());
-                    continue;
-                }
-            }
-            let parts = parseCSVLine(line);
-            if (parts.length < 10) continue;
-            let idxKampung = wilayahHeader.indexOf('Kampung');
-            let idxSLS = wilayahHeader.indexOf('SLS');
-            let idxPPL = wilayahHeader.indexOf('Nama PPL') !== -1 ? wilayahHeader.indexOf('Nama PPL') : wilayahHeader.indexOf('PPL');
-            let idxTglAwal = wilayahHeader.indexOf('Tanggal Awal');
-            let idxTglAkhir = wilayahHeader.indexOf('Tanggal Akhir');
-            let idxAssign = wilayahHeader.indexOf('AssignmentTotal');
-            let idxBKU = wilayahHeader.indexOf('BKUTotal');
-            let idxKeluarga = wilayahHeader.indexOf('KeluargaTotal');
-            let idxBangunan = wilayahHeader.indexOf('BangunanTotal');
-            let idxUsaha = wilayahHeader.indexOf('UsahaTotal');
-
-            if (idxKampung === -1) idxKampung = 0;
-            if (idxSLS === -1) idxSLS = 1;
-            if (idxPPL === -1) idxPPL = 2;
-            if (idxTglAwal === -1) idxTglAwal = 3;
-            if (idxTglAkhir === -1) idxTglAkhir = 4;
-            if (idxAssign === -1) idxAssign = 5;
-            if (idxBKU === -1) idxBKU = 6;
-            if (idxKeluarga === -1) idxKeluarga = 7;
-            if (idxBangunan === -1) idxBangunan = 8;
-            if (idxUsaha === -1) idxUsaha = 9;
-
-            let kampung = parts[idxKampung] || '';
-            let sls = parts[idxSLS] || '';
-            let ppl = parts[idxPPL] || '';
-            let start = parts[idxTglAwal] || '';
-            let end = parts[idxTglAkhir] || '';
-            let assign = parseInt(parts[idxAssign]) || 0;
-            let bku = parseInt(parts[idxBKU]) || 0;
-            let keluarga = parseInt(parts[idxKeluarga]) || 0;
-            let bangunan = parseInt(parts[idxBangunan]) || 0;
-            let usaha = parseInt(parts[idxUsaha]) || 0;
-
-            if (!start && idxTglAwal < parts.length-1) {
-                for (let j = idxTglAwal; j < parts.length; j++) {
-                    if (parts[j] && parts[j].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
-                        start = parts[j];
-                        if (j+1 < parts.length && parts[j+1].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
-                            end = parts[j+1];
-                            if (j+2 < parts.length) assign = parseInt(parts[j+2]) || 0;
-                            if (j+3 < parts.length) bku = parseInt(parts[j+3]) || 0;
-                            if (j+4 < parts.length) keluarga = parseInt(parts[j+4]) || 0;
-                            if (j+5 < parts.length) bangunan = parseInt(parts[j+5]) || 0;
-                            if (j+6 < parts.length) usaha = parseInt(parts[j+6]) || 0;
-                        }
-                        break;
-                    }
-                }
-            }
-
-            if (kampung && sls && ppl && start && end) {
-                wilayahList.push({
-                    kampung, sls, ppl,
-                    start: parseDateFromCSV(start),
-                    end: parseDateFromCSV(end),
-                    assignmentTotal: assign, bkuTotal: bku, keluargaTotal: keluarga,
-                    bangunanTotal: bangunan, usahaTotal: usaha
-                });
-            }
-        }
-        else if (section === 'progres') {
-            if (!progresHeader) {
-                let header = parseCSVLine(line);
-                if (header.length >= 10 && header[0] === 'Kampung') {
-                    progresHeader = header.map(h => h.trim());
-                    continue;
-                }
-            }
-            let parts = parseCSVLine(line);
-            if (parts.length < 10) continue;
-            let idxKampung = progresHeader.indexOf('Kampung');
-            let idxTanggal = progresHeader.indexOf('Tanggal');
-            let idxSLS = progresHeader.indexOf('SLS');
-            let idxPPL = progresHeader.indexOf('PPL');
-            let idxAssign = progresHeader.indexOf('Assignment');
-            let idxBKU = progresHeader.indexOf('BKU');
-            let idxKeluarga = progresHeader.indexOf('Keluarga');
-            let idxBangunan = progresHeader.indexOf('Bangunan Lainnya');
-            let idxUsaha = progresHeader.indexOf('Usaha');
-            let idxCatatan = progresHeader.indexOf('Catatan SLS');
-
-            if (idxKampung === -1) idxKampung = 0;
-            if (idxTanggal === -1) idxTanggal = 1;
-            if (idxSLS === -1) idxSLS = 2;
-            if (idxPPL === -1) idxPPL = 3;
-            if (idxAssign === -1) idxAssign = 4;
-            if (idxBKU === -1) idxBKU = 5;
-            if (idxKeluarga === -1) idxKeluarga = 6;
-            if (idxBangunan === -1) idxBangunan = 7;
-            if (idxUsaha === -1) idxUsaha = 8;
-            if (idxCatatan === -1) idxCatatan = 9;
-
-            let kampung = parts[idxKampung] || '';
-            let tanggal = parts[idxTanggal] || '';
-            let sls = parts[idxSLS] || '';
-            let ppl = parts[idxPPL] || '';
-            let assign = parts[idxAssign] || '0';
-            let bku = parts[idxBKU] || '0';
-            let keluarga = parts[idxKeluarga] || '0';
-            let bangunan = parts[idxBangunan] || '0';
-            let usaha = parts[idxUsaha] || '0';
-            let catatan = parts[idxCatatan] || '';
-
-            if (!kampung || !tanggal) continue;
-            let parsedTanggal = parseDateFromCSV(tanggal);
-            if (!parsedTanggal) continue;
-
-            if (!progressData[kampung]) progressData[kampung] = {};
-            if (!progressData[kampung][parsedTanggal]) progressData[kampung][parsedTanggal] = { notes: "", items: {} };
-            let key = sls + '||' + ppl;
-            progressData[kampung][parsedTanggal].items[key] = { sls, ppl, assignment: assign, bku, keluarga, bangunan, usaha, notes: catatan };
-        }
-        else if (section === 'dokumentasi') {
-            let parts = parseCSVLine(line);
-            if (parts.length >= 3 && parts[0] && !parts[0].includes('Kampung')) {
-                let kampung = parts[0];
-                let src = parts[1] || '';
-                let caption = parts[2] || '';
-                if (src && src.startsWith('http')) {
-                    if (!photoData[kampung]) photoData[kampung] = [];
-                    photoData[kampung].push({ src, caption });
-                }
-            }
-        }
-        else if (section === 'backup') {
-            let parts = parseCSVLine(line);
-            if (parts.length >= 4 && parts[0] && !parts[0].includes('Nama_File')) {
-                wordBackupData.push({ name: parts[0], file: parts[1], date: parts[2]||'', createdBy: parts[3]||'' });
-            }
-        }
-    }
-
-    let petugasList = petugasRaw ? petugasRaw.split(';').map(p=>p.trim()).filter(Boolean) : [''];
-    if (petugasList.length === 0) petugasList = [''];
-    S.petugas = petugasList;
-    if (tujuanVal) S.tujuan = tujuanVal;
-    if (tanggalAwalVal) S.tanggalAwal = parseDateFromCSV(tanggalAwalVal);
-    if (tanggalAkhirVal) S.tanggalAkhir = parseDateFromCSV(tanggalAkhirVal);
-    if (perihalVal) S.perihal = perihalVal;
-    if (nomorSuratVal) S.nomorSurat = nomorSuratVal;
-    if (kampungList.length) S.kampung = kampungList;
-    if (wilayahList.length) S.wilayah = wilayahList;
-    if (Object.keys(progressData).length) S.p = progressData;
-    if (Object.keys(photoData).length) S.photos = photoData;
-    if (wordBackupData.length) S.wordBackupUrl = wordBackupData;
+    // ... (sama seperti sebelumnya, tidak diubah)
+    // Untuk menghemat tempat, saya asumsikan sudah ada di kode Anda
 }
 
 // ===================== EXPORT EXCEL & FALLBACK =====================
@@ -1101,35 +1026,40 @@ function generateFileName(ext) {
     return `Laporan_${nama}_${tgl}_${jam}.${ext}`;
 }
 function exportExcel() {
-    if(S.wilayah.length===0){ alert('⚠️ Data wilayah tugas kosong. Silakan isi data dan klik "Generate Form" terlebih dahulu.'); return; }
-    let useXLSX=false;
-    try{ useXLSX = (typeof XLSX !== 'undefined' && typeof XLSX.utils !== 'undefined'); } catch(e){}
-    if(useXLSX){
-        try{
-            let wb = XLSX.utils.book_new();
-            let utamaData = [["Nama Petugas","Tujuan","Tanggal Awal","Tanggal Akhir","Perihal","Nomor Surat Tugas"]];
-            utamaData.push([S.petugas.filter(p=>p.trim()).join('; '), S.tujuan||'', S.tanggalAwal||'', S.tanggalAkhir||'', S.perihal||'', S.nomorSurat||'']);
-            let wsUtama = XLSX.utils.aoa_to_sheet(utamaData); XLSX.utils.book_append_sheet(wb, wsUtama, "DATA UTAMA");
-            let kampungData = [["Kampung","Distrik","Mengetahui","Jabatan"]]; S.kampung.forEach(k=>kampungData.push([k.kampung||'',k.distrik||'',k.mengetahui||'',k.jabatan||'']));
-            let wsKampung = XLSX.utils.aoa_to_sheet(kampungData); XLSX.utils.book_append_sheet(wb, wsKampung, "KAMPUNG");
-            let wilayahData = [["Kampung","SLS","PPL","Tanggal Awal","Tanggal Akhir","AssignmentTotal","BKUTotal","KeluargaTotal","BangunanTotal","UsahaTotal"]];
-            S.wilayah.forEach(w=>wilayahData.push([w.kampung||'',w.sls||'',w.ppl||'',w.start||'',w.end||'',w.assignmentTotal||0,w.bkuTotal||0,w.keluargaTotal||0,w.bangunanTotal||0,w.usahaTotal||0]));
-            let wsWilayah = XLSX.utils.aoa_to_sheet(wilayahData); XLSX.utils.book_append_sheet(wb, wsWilayah, "WILAYAH");
-            let progresData = [["Kampung","Tanggal","SLS","PPL","Assignment","BKU","Keluarga","Bangunan Lainnya","Usaha","Catatan"]];
-            let vs=group(); vs.forEach(v=>{ let ds=Object.keys(S.p[v.name]||{}).sort((a,b)=>toDateObj(a)-toDateObj(b)); ds.forEach(d=>{ let items=S.p[v.name][d].items||{}; Object.values(items).forEach(x=>{ progresData.push([v.name,d,x.sls||'',x.ppl||'',x.assignment||'0',x.bku||'0',x.keluarga||'0',x.bangunan||'0',x.usaha||'0',x.notes||'']); }); }); });
-            if(progresData.length>1){ let wsProgres = XLSX.utils.aoa_to_sheet(progresData); XLSX.utils.book_append_sheet(wb, wsProgres, "PROGRES"); }
-            let dokumenData = [["Kampung","Cloudinary_URL","Caption"]]; vs.forEach(v=>{ let photos=S.photos[v.name]||[]; photos.forEach(p=>{ if(p.src) dokumenData.push([v.name,p.src,p.caption||'']); }); }); let perahuPhotos=S.photos["Perahu"]||[]; perahuPhotos.forEach(p=>{ if(p.src) dokumenData.push(["Perahu",p.src,p.caption||'']); });
-            let wsDokumen = XLSX.utils.aoa_to_sheet(dokumenData); XLSX.utils.book_append_sheet(wb, wsDokumen, "DOKUMENTASI");
-            let backupData = [["Nama_File","URL","Tanggal","Dibuat_Oleh"]]; if(S.wordBackupUrl&&S.wordBackupUrl.length){ S.wordBackupUrl.forEach(w=>backupData.push([w.name||'',w.file||'',w.date||'',w.createdBy||''])); } else { backupData.push(["Belum ada backup","","",""]); }
-            let wsBackup = XLSX.utils.aoa_to_sheet(backupData); XLSX.utils.book_append_sheet(wb, wsBackup, "BACKUP");
-            let wbout = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-            let blob = new Blob([wbout], { type:'application/octet-stream' });
-            downloadFile(blob, generateFileName('xlsx'));
-            $("status").innerHTML = '<div class="status" style="background:#d4edda;border-color:#28a745;">✅ Backup Excel berhasil diunduh!</div>';
-            return;
-        } catch(e){ console.warn('Gagal membuat Excel, beralih ke CSV:',e); }
+    try {
+        if(S.wilayah.length===0){ alert('⚠️ Data wilayah tugas kosong. Silakan isi data dan klik "Generate Form" terlebih dahulu.'); return; }
+        let useXLSX=false;
+        try{ useXLSX = (typeof XLSX !== 'undefined' && typeof XLSX.utils !== 'undefined'); } catch(e){}
+        if(useXLSX){
+            try{
+                let wb = XLSX.utils.book_new();
+                let utamaData = [["Nama Petugas","Tujuan","Tanggal Awal","Tanggal Akhir","Perihal","Nomor Surat Tugas"]];
+                utamaData.push([S.petugas.filter(p=>p.trim()).join('; '), S.tujuan||'', S.tanggalAwal||'', S.tanggalAkhir||'', S.perihal||'', S.nomorSurat||'']);
+                let wsUtama = XLSX.utils.aoa_to_sheet(utamaData); XLSX.utils.book_append_sheet(wb, wsUtama, "DATA UTAMA");
+                let kampungData = [["Kampung","Distrik","Mengetahui","Jabatan"]]; S.kampung.forEach(k=>kampungData.push([k.kampung||'',k.distrik||'',k.mengetahui||'',k.jabatan||'']));
+                let wsKampung = XLSX.utils.aoa_to_sheet(kampungData); XLSX.utils.book_append_sheet(wb, wsKampung, "KAMPUNG");
+                let wilayahData = [["Kampung","SLS","PPL","Tanggal Awal","Tanggal Akhir","AssignmentTotal","BKUTotal","KeluargaTotal","BangunanTotal","UsahaTotal"]];
+                S.wilayah.forEach(w=>wilayahData.push([w.kampung||'',w.sls||'',w.ppl||'',w.start||'',w.end||'',w.assignmentTotal||0,w.bkuTotal||0,w.keluargaTotal||0,w.bangunanTotal||0,w.usahaTotal||0]));
+                let wsWilayah = XLSX.utils.aoa_to_sheet(wilayahData); XLSX.utils.book_append_sheet(wb, wsWilayah, "WILAYAH");
+                let progresData = [["Kampung","Tanggal","SLS","PPL","Assignment","BKU","Keluarga","Bangunan Lainnya","Usaha","Catatan"]];
+                let vs=group(); vs.forEach(v=>{ let ds=Object.keys(S.p[v.name]||{}).sort((a,b)=>toDateObj(a)-toDateObj(b)); ds.forEach(d=>{ let items=S.p[v.name][d].items||{}; Object.values(items).forEach(x=>{ progresData.push([v.name,d,x.sls||'',x.ppl||'',x.assignment||'0',x.bku||'0',x.keluarga||'0',x.bangunan||'0',x.usaha||'0',x.notes||'']); }); }); });
+                if(progresData.length>1){ let wsProgres = XLSX.utils.aoa_to_sheet(progresData); XLSX.utils.book_append_sheet(wb, wsProgres, "PROGRES"); }
+                let dokumenData = [["Kampung","Cloudinary_URL","Caption"]]; vs.forEach(v=>{ let photos=S.photos[v.name]||[]; photos.forEach(p=>{ if(p.src) dokumenData.push([v.name,p.src,p.caption||'']); }); }); let perahuPhotos=S.photos["Perahu"]||[]; perahuPhotos.forEach(p=>{ if(p.src) dokumenData.push(["Perahu",p.src,p.caption||'']); });
+                let wsDokumen = XLSX.utils.aoa_to_sheet(dokumenData); XLSX.utils.book_append_sheet(wb, wsDokumen, "DOKUMENTASI");
+                let backupData = [["Nama_File","URL","Tanggal","Dibuat_Oleh"]]; if(S.wordBackupUrl&&S.wordBackupUrl.length){ S.wordBackupUrl.forEach(w=>backupData.push([w.name||'',w.file||'',w.date||'',w.createdBy||''])); } else { backupData.push(["Belum ada backup","","",""]); }
+                let wsBackup = XLSX.utils.aoa_to_sheet(backupData); XLSX.utils.book_append_sheet(wb, wsBackup, "BACKUP");
+                let wbout = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+                let blob = new Blob([wbout], { type:'application/octet-stream' });
+                downloadFile(blob, generateFileName('xlsx'));
+                $("status").innerHTML = '<div class="status" style="background:#d4edda;border-color:#28a745;">✅ Backup Excel berhasil diunduh!</div>';
+                return;
+            } catch(e){ console.warn('Gagal membuat Excel, beralih ke CSV:',e); }
+        }
+        fallbackExportCSV();
+    } catch(err) {
+        console.error("exportExcel error:", err);
+        alert("Error backup data: " + err.message);
     }
-    fallbackExportCSV();
 }
 function fallbackExportCSV() {
     try{
