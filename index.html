@@ -368,9 +368,9 @@ function parseDateFromCSV(dateStr) {
     return formatDateObj(d);
 }
 
-// ===================== CLOUDINARY (DIPERBAIKI) =====================
+// ===================== CLOUDINARY (HANYA UNTUK GAMBAR) =====================
 const CLOUDINARY_CLOUD_NAME = "uxr4cmqd";
-const CLOUDINARY_UPLOAD_PRESET = "Laporan"; // ganti dari "Laporan" menjadi "ml_default"
+const CLOUDINARY_UPLOAD_PRESET = "Laporan";
 
 function uploadFileToCloudinary(file, isImage, onSuccess, onError) {
     let formData = new FormData();
@@ -395,7 +395,6 @@ function uploadFileToCloudinary(file, isImage, onSuccess, onError) {
         .catch(err => {
             console.error("Upload Cloudinary error:", err);
             if (onError) onError(err);
-            // Jika tidak ada onError, diamkan (hanya log di console)
         });
 }
 
@@ -802,14 +801,14 @@ function preview(){
     } catch(err){ console.error(err); alert("Error saat Preview."); }
 }
 
-// ===================== DOWNLOAD WORD + BACKUP (DIPERBAIKI) =====================
+// ===================== DOWNLOAD WORD (TANPA UPLOAD) =====================
 function word(){
     try {
         if(validate()){alert(validate());return;}
         let vs=group(), imagesToResize=[], imageKeys=[];
         vs.forEach(v=>{ let photos=S.photos[v.name]||[]; photos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push(v.name+'_'+idx); } }); });
         let perahuPhotos=S.photos["Perahu"]||[]; perahuPhotos.forEach((p,idx)=>{ if(p.src){ imagesToResize.push(p.src); imageKeys.push('Perahu_'+idx); } });
-        if(imagesToResize.length===0){ generateOfflineWordAndBackup({}); return; }
+        if(imagesToResize.length===0){ generateOfflineWord({}); return; }
         $("status").innerHTML='<div class="status">⏳ Mengunduh gambar dari Cloudinary...</div>';
         let resizedImages={}, completed=0, total=imagesToResize.length;
         imagesToResize.forEach((src,idx)=>{
@@ -817,29 +816,22 @@ function word(){
                 let reader=new FileReader(); reader.onloadend=function(){ let base64=reader.result; let key=imageKeys[idx]; resizeImageToHeight(base64,9.2,function(resizedSrc){ resizedImages[key]=resizedSrc; completed++; checkComplete(); }); }; reader.readAsDataURL(blob);
             }).catch(err=>{ console.warn("Gagal download gambar: ",src); completed++; checkComplete(); });
         });
-        function checkComplete(){ if(completed===total){ $("status").innerHTML='<div class="status">⏳ Membuat file Word...</div>'; setTimeout(()=>{ generateOfflineWordAndBackup(resizedImages); },500); } }
+        function checkComplete(){ if(completed===total){ $("status").innerHTML='<div class="status">⏳ Membuat file Word...</div>'; setTimeout(()=>{ generateOfflineWord(resizedImages); },500); } }
     } catch(err){ console.error(err); alert("Error saat Download Word."); }
 }
 
-// ===== GENERATE WORD + UPLOAD KE CLOUDINARY (BACKUP DIAM-DIAM) =====
-function generateOfflineWordAndBackup(resizedImages){
+// ===== GENERATE WORD (DOWNLOAD SAJA, TANPA UPLOAD) =====
+function generateOfflineWord(resizedImages){
     try {
         let htmlContent = generateWordHTML(resizedImages);
         let blob = new Blob(["\ufeff" + htmlContent], { type: "application/msword;charset=utf-8" });
 
-        // Ambil nama PPL pertama untuk nama file
-        let pplNames = [];
-        S.wilayah.forEach(w => {
-            if (w.ppl && w.ppl.trim() && !pplNames.includes(w.ppl.trim())) {
-                pplNames.push(w.ppl.trim());
-            }
-        });
         let ppl = S.petugas.filter(p=>p.trim());
         let namaPpl = ppl.length > 0 ? ppl[0] : "TanpaNama";
         let tanggalSekarang = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }).replace(/\s/g, "_");
         let fileName = `Laporan_Perjalanan_Dinas_Tim_${namaPpl}_${tanggalSekarang}.doc`;
 
-        // ===== DOWNLOAD FILE (tetap dilakukan) =====
+        // ===== DOWNLOAD FILE =====
         let link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = fileName;
@@ -848,34 +840,13 @@ function generateOfflineWordAndBackup(resizedImages){
         document.body.removeChild(link);
         setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 
-        // ===== UPLOAD KE CLOUDINARY (DIAM-DIAM, TIDAK MENGGANGGU USER) =====
-        $("status").innerHTML = '<div class="status">⏳ Mengupload backup Word ke Cloudinary...</div>';
-
-        uploadFileToCloudinary(blob, false, function (wordUrl, displayName) {
-            // Sukses upload
-            if (!S.wordBackupUrl) S.wordBackupUrl = [];
-            S.wordBackupUrl.push({
-                file: wordUrl,
-                date: new Date().toISOString(),
-                name: fileName,
-                createdBy: namaPpl
-            });
-            $("status").innerHTML = `<div class="status" style="background:#d4edda; border-color:#28a745;">
-                ✅ File Word berhasil didownload & di-backup ke Cloudinary!<br>
-                🔗 <a href="${wordUrl}" target="_blank">Lihat Backup di Cloud</a>
-            </div>`;
-            save(); // simpan state ke localStorage
-        }, function (error) {
-            // Error upload: hanya catat di console dan status ringan (tidak mengganggu)
-            console.error("Upload Cloudinary gagal (diam-diam):", error);
-            $("status").innerHTML = `<div class="status" style="background:#f8d7da; border-color:#dc3545;">
-                ⚠️ File Word berhasil didownload, tetapi backup ke Cloudinary gagal.<br>
-                <small>Error: ${error.message || 'Unknown error'}. Coba lagi nanti.</small>
-            </div>`;
-        });
+        $("status").innerHTML = `<div class="status" style="background:#d4edda; border-color:#28a745;">
+            ✅ File Word berhasil didownload!<br>
+            📁 ${fileName}
+        </div>`;
 
     } catch (err) {
-        console.error("Error di generateOfflineWordAndBackup:", err);
+        console.error("Error di generateOfflineWord:", err);
         alert("Terjadi error pada proses Word. Cek konsol browser (F12).");
     }
 }
